@@ -1,5 +1,7 @@
 package com.alexlego19.ainpcs.entity;
 
+import com.alexlego19.ainpcs.backend.LLMService;
+import com.google.gson.JsonObject;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -12,6 +14,7 @@ import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.server.MinecraftServer;
 
 public class NpcEntity extends PathfinderMob {
     public NpcEntity(EntityType<? extends PathfinderMob> type, Level level) {
@@ -34,11 +37,33 @@ public class NpcEntity extends PathfinderMob {
     @Override
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (!this.level().isClientSide() && hand == InteractionHand.MAIN_HAND) {
-            // Provide test interactive dialogue to the player.
-            // This is a stepping stone for future LLM integration.
-            player.sendSystemMessage(Component.literal("<NPC> Hello traveler! I am a simple AI prototype. In the future, I will use LLMs to converse with you!"));
-            return net.minecraft.world.InteractionResult.sidedSuccess(this.level().isClientSide());
+            MinecraftServer server = this.level().getServer();
+            if (server != null) {
+                // Initial immediate feedback
+                player.sendSystemMessage(Component.literal("<NPC> *thinking...*"));
+
+                // Fire off asynchronous request to the backend
+                LLMService.requestDialogueAsync("Hello there!")
+                    .thenAccept(responseJson -> {
+                        // Ensure game-state mutations (sending chat) happen on the main thread
+                        server.execute(() -> {
+                            if (responseJson.has("spoken_text")) {
+                                String text = responseJson.get("spoken_text").getAsString();
+                                player.sendSystemMessage(Component.literal("<NPC> " + text));
+                            } else {
+                                player.sendSystemMessage(Component.literal("<NPC> *confused silence*"));
+                            }
+                        });
+                    })
+                    .exceptionally(throwable -> {
+                        server.execute(() -> {
+                            player.sendSystemMessage(Component.literal("<System> Error communicating with NPC."));
+                        });
+                        return null;
+                    });
+            }
+            return InteractionResult.SUCCESS;
         }
-        return super.mobInteract(player, hand);
+        return net.minecraft.world.InteractionResult.sidedSuccess(this.level().isClientSide());
     }
 }
