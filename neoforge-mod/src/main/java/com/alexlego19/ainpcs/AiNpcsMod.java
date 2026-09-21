@@ -24,6 +24,7 @@ import com.alexlego19.ainpcs.init.EntityInit;
 import com.alexlego19.ainpcs.init.ItemInit;
 import com.alexlego19.ainpcs.init.CreativeTabInit;
 import net.minecraftforge.fml.config.ModConfig;
+import com.alexlego19.ainpcs.data.NPCProfileManager;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -76,10 +77,12 @@ public class AiNpcsMod
 
         // Register our mod's ForgeConfigSpec so that Forge can create and load the config file for us
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, com.alexlego19.ainpcs.config.AiNpcsClientConfig.SPEC);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event)
     {
+        NPCProfileManager.load();
         // Some common setup code
         LOGGER.info("HELLO FROM COMMON SETUP");
 
