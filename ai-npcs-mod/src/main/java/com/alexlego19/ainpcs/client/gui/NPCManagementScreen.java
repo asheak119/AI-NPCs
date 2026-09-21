@@ -15,6 +15,9 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.LightTexture;
+import com.mojang.math.Axis;
 import net.minecraft.network.chat.Component;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -47,7 +50,7 @@ public class NPCManagementScreen extends Screen {
 
     private void loadAvailableSkins() {
         this.availableSkins.clear();
-        this.availableSkins.add("steve");
+        this.availableSkins.add(""); // Empty represents default steve/alex
         File skinsDir = NPCProfileManager.getSkinsDir().toFile();
         if (skinsDir.exists() && skinsDir.isDirectory()) {
             File[] files = skinsDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".png"));
@@ -62,19 +65,24 @@ public class NPCManagementScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        int centerX = this.width / 2;
+
+        int listWidth = Math.max(120, (int)(this.width * 0.3));
+        int editorStartX = listWidth + 20;
+        int editorWidth = Math.min(200, this.width - listWidth - 40);
+        int centerX = editorStartX + (editorWidth / 2);
         int centerY = this.height / 2;
 
         this.classicModel = new PlayerModel<>(this.minecraft.getEntityModels().bakeLayer(ModelLayers.PLAYER), false);
         this.slimModel = new PlayerModel<>(this.minecraft.getEntityModels().bakeLayer(ModelLayers.PLAYER_SLIM), true);
 
-        this.profileList = new ProfileList(this.minecraft, 150, this.height, 40, this.height - 40, 25);
+        // List takes up the left side, scrolling area
+        this.profileList = new ProfileList(this.minecraft, listWidth, this.height, 40, this.height - 40, 25);
         this.addRenderableWidget(this.profileList);
 
         this.addRenderableWidget(Button.builder(Component.literal("New NPC"), b -> createNewProfile())
-                .bounds(25, 10, 100, 20).build());
+                .bounds(10, 10, listWidth - 20, 20).build());
 
-        this.nameEditBox = new EditBox(this.font, centerX, centerY - 60, 150, 20, Component.literal("Name"));
+        this.nameEditBox = new EditBox(this.font, centerX - (editorWidth / 2), centerY - 60, editorWidth, 20, Component.literal("Name"));
         this.nameEditBox.setResponder(s -> {
             if (hasEditableSelected()) {
                 profileList.getSelected().getProfile().setName(s);
@@ -82,14 +90,14 @@ public class NPCManagementScreen extends Screen {
         });
         this.addRenderableWidget(this.nameEditBox);
 
-        this.skinDropdownBtn = Button.builder(Component.literal("Skin: steve"), b -> {
+        this.skinDropdownBtn = Button.builder(Component.literal("Skin: Default"), b -> {
             if (hasEditableSelected()) {
                 currentSkinIndex = (currentSkinIndex + 1) % availableSkins.size();
                 String newSkin = availableSkins.get(currentSkinIndex);
                 profileList.getSelected().getProfile().setSkinId(newSkin);
-                b.setMessage(Component.literal("Skin: " + newSkin));
+                b.setMessage(Component.literal("Skin: " + (newSkin.isEmpty() ? "Default" : newSkin)));
             }
-        }).bounds(centerX, centerY - 30, 150, 20).build();
+        }).bounds(centerX - (editorWidth / 2), centerY - 30, editorWidth, 20).build();
         this.addRenderableWidget(this.skinDropdownBtn);
 
         this.toggleModelBtn = Button.builder(Component.literal("Model: Classic"), b -> {
@@ -98,7 +106,7 @@ public class NPCManagementScreen extends Screen {
                 p.setSlim(!p.isSlim());
                 b.setMessage(Component.literal("Model: " + (p.isSlim() ? "Slim" : "Classic")));
             }
-        }).bounds(centerX, centerY, 150, 20).build();
+        }).bounds(centerX - (editorWidth / 2), centerY, editorWidth, 20).build();
         this.addRenderableWidget(this.toggleModelBtn);
 
         this.toggleEnableBtn = Button.builder(Component.literal("Enabled: Yes"), b -> {
@@ -107,7 +115,7 @@ public class NPCManagementScreen extends Screen {
                 p.setEnabled(!p.isEnabled());
                 b.setMessage(Component.literal("Enabled: " + (p.isEnabled() ? "Yes" : "No")));
             }
-        }).bounds(centerX, centerY + 30, 150, 20).build();
+        }).bounds(centerX - (editorWidth / 2), centerY + 30, editorWidth, 20).build();
         this.addRenderableWidget(this.toggleEnableBtn);
 
         this.deleteBtn = Button.builder(Component.literal("Delete"), b -> {
@@ -118,11 +126,11 @@ public class NPCManagementScreen extends Screen {
                         Component.literal("Deleting this NPC profile will permanently remove it and despawn all existing instances currently in your worlds. Are you sure you want to proceed?")
                 ));
             }
-        }).bounds(centerX, centerY + 60, 150, 20).build();
+        }).bounds(centerX - (editorWidth / 2), centerY + 60, editorWidth, 20).build();
         this.addRenderableWidget(this.deleteBtn);
 
         Button doneBtn = Button.builder(Component.literal("Done"), b -> this.onClose())
-                .bounds(this.width / 2 - 100, this.height - 30, 200, 20).build();
+                .bounds(this.width - 110, this.height - 30, 100, 20).build();
         this.addRenderableWidget(doneBtn);
 
         updateEditorFields();
@@ -144,7 +152,7 @@ public class NPCManagementScreen extends Screen {
     private void createNewProfile() {
         String id = UUID.randomUUID().toString();
         String defaultName = "New NPC";
-        String skinId = "steve";
+        String skinId = "";
 
         String expectedSkinName = defaultName.toLowerCase().replace(" ", "_");
         if (availableSkins.contains(expectedSkinName)) {
@@ -173,13 +181,13 @@ public class NPCManagementScreen extends Screen {
             this.nameEditBox.setValue(p.getName());
 
             this.currentSkinIndex = Math.max(0, availableSkins.indexOf(p.getSkinId()));
-            this.skinDropdownBtn.setMessage(Component.literal("Skin: " + (p.getSkinId() != null ? p.getSkinId() : "steve")));
+            this.skinDropdownBtn.setMessage(Component.literal("Skin: " + (p.getSkinId() != null && !p.getSkinId().isEmpty() ? p.getSkinId() : "Default")));
 
             this.toggleModelBtn.setMessage(Component.literal("Model: " + (p.isSlim() ? "Slim" : "Classic")));
             this.toggleEnableBtn.setMessage(Component.literal("Enabled: " + (p.isEnabled() ? "Yes" : "No")));
         } else {
             this.nameEditBox.setValue("");
-            this.skinDropdownBtn.setMessage(Component.literal("Skin: steve"));
+            this.skinDropdownBtn.setMessage(Component.literal("Skin: Default"));
         }
     }
 
@@ -205,19 +213,17 @@ public class NPCManagementScreen extends Screen {
         poseStack.pushPose();
         poseStack.translate(x, y, 1050.0D);
         poseStack.scale(1.0F, 1.0F, -1.0F);
-
         poseStack.translate(0.0D, 0.0D, 1000.0D);
-        poseStack.scale(scale, scale, scale);
+        poseStack.scale((float)scale, (float)scale, (float)scale);
 
-        Quaternionf quaternionf = new Quaternionf().rotateZ((float)Math.PI);
-        Quaternionf quaternionf1 = new Quaternionf().rotateX(rotY * 20.0F * ((float)Math.PI / 180F));
+        Quaternionf quaternionf = Axis.ZP.rotationDegrees(180.0F);
+        Quaternionf quaternionf1 = Axis.XP.rotationDegrees(rotY * 20.0F);
         quaternionf.mul(quaternionf1);
         poseStack.mulPose(quaternionf);
 
         PlayerModel<?> activeModel = profile.isSlim() ? this.slimModel : this.classicModel;
         activeModel.young = false;
 
-        // Setup rotations to simulate entity rotation
         activeModel.head.yRot = rotX * 40.0F * ((float)Math.PI / 180F);
         activeModel.head.xRot = -rotY * 20.0F * ((float)Math.PI / 180F);
         activeModel.hat.yRot = activeModel.head.yRot;
@@ -227,7 +233,7 @@ public class NPCManagementScreen extends Screen {
         RenderSystem.setShaderLights(new org.joml.Vector3f(0.2F, 1.0F, -0.7F), new org.joml.Vector3f(-0.2F, 1.0F, 0.7F));
 
         MultiBufferSource.BufferSource bufferSource = this.minecraft.renderBuffers().bufferSource();
-        activeModel.renderToBuffer(poseStack, bufferSource.getBuffer(activeModel.renderType(DynamicSkinManager.getSkin(profile.getSkinId(), profile.isSlim()))), 15728880, 65536, 1.0F, 1.0F, 1.0F, 1.0F);
+        activeModel.renderToBuffer(poseStack, bufferSource.getBuffer(activeModel.renderType(DynamicSkinManager.getSkin(profile.getSkinId(), profile.isSlim()))), LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F);
         bufferSource.endBatch();
 
         poseStack.popPose();
