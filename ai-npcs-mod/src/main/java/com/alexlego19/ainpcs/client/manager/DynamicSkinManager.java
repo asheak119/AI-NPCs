@@ -53,8 +53,10 @@ public class DynamicSkinManager {
             }
         }
 
-        // Fallback if loading fails
-        return isSlim ? DefaultPlayerSkin.getDefaultSkin(ALEX_UUID) : DefaultPlayerSkin.getDefaultSkin(STEVE_UUID);
+        // Fallback if loading fails or file does not exist
+        ResourceLocation fallback = isSlim ? DefaultPlayerSkin.getDefaultSkin(ALEX_UUID) : DefaultPlayerSkin.getDefaultSkin(STEVE_UUID);
+        skinCache.put(skinId, fallback);
+        return fallback;
     }
 
     public static void clearCache() {

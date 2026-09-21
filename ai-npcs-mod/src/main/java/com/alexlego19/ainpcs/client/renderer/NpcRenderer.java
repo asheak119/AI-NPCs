@@ -36,7 +36,7 @@ public class NpcRenderer extends HumanoidMobRenderer<NpcEntity, PlayerModel<NpcE
 
     @Override
     public ResourceLocation getTextureLocation(NpcEntity entity) {
-        String profileId = entity.getProfileId();
+        String profileId = entity.getVariant();
         if (profileId != null && !profileId.isEmpty()) {
             // Read client side profiles via config
             NPCProfile profile = NPCProfileManager.getProfile(profileId);
