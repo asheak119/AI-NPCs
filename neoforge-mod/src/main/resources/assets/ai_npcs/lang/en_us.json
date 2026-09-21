@@ -1,5 +1,5 @@
 {
-  "itemGroup.ai_npcs": "Example Mod Tab",
-  "block.ai_npcs.example_block": "Example Block",
-  "item.ai_npcs.example_item": "Example Item"
+  "item.ai_npcs.npc_spawn_egg": "NPC Spawn Egg",
+  "itemGroup.ai_npcs_tab": "LLM Powered NPCs",
+  "entity.ai_npcs.npc": "NPC"
 }
