@@ -14,13 +14,12 @@ import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelLayers;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.client.renderer.LightTexture;
-import com.mojang.math.Axis;
 import net.minecraft.network.chat.Component;
-import org.joml.Matrix4f;
 import org.joml.Quaternionf;
+import com.mojang.math.Axis;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -50,7 +49,8 @@ public class NPCManagementScreen extends Screen {
 
     private void loadAvailableSkins() {
         this.availableSkins.clear();
-        this.availableSkins.add(""); // Empty represents default steve/alex
+        this.availableSkins.add("steve");
+        this.availableSkins.add("alex");
         File skinsDir = NPCProfileManager.getSkinsDir().toFile();
         if (skinsDir.exists() && skinsDir.isDirectory()) {
             File[] files = skinsDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".png"));
@@ -66,8 +66,8 @@ public class NPCManagementScreen extends Screen {
     protected void init() {
         super.init();
 
-        int listWidth = Math.max(100, (int)(this.width * 0.2));
-        int previewWidth = Math.max(120, (int)(this.width * 0.25));
+        int listWidth = Math.max(120, (int)(this.width * 0.3));
+        int previewWidth = Math.max(120, (int)(this.width * 0.3));
 
         int centerAreaWidth = this.width - listWidth - previewWidth;
         int editorWidth = Math.min(180, centerAreaWidth - 20);
@@ -77,12 +77,14 @@ public class NPCManagementScreen extends Screen {
         this.classicModel = new PlayerModel<>(this.minecraft.getEntityModels().bakeLayer(ModelLayers.PLAYER), false);
         this.slimModel = new PlayerModel<>(this.minecraft.getEntityModels().bakeLayer(ModelLayers.PLAYER_SLIM), true);
 
+        // Left Panel - Scrolling List
         this.profileList = new ProfileList(this.minecraft, listWidth, this.height, 40, this.height - 40, 25);
         this.addRenderableWidget(this.profileList);
 
         this.addRenderableWidget(Button.builder(Component.literal("New NPC"), b -> createNewProfile())
                 .bounds(10, 10, listWidth - 20, 20).build());
 
+        // Center Panel - Editor Controls
         this.nameEditBox = new EditBox(this.font, centerX - (editorWidth / 2), centerY - 70, editorWidth, 20, Component.literal("Name"));
         this.nameEditBox.setResponder(s -> {
             if (hasEditableSelected()) {
@@ -91,12 +93,12 @@ public class NPCManagementScreen extends Screen {
         });
         this.addRenderableWidget(this.nameEditBox);
 
-        this.skinDropdownBtn = Button.builder(Component.literal("Skin: Default"), b -> {
+        this.skinDropdownBtn = Button.builder(Component.literal("Skin: steve"), b -> {
             if (hasEditableSelected()) {
                 currentSkinIndex = (currentSkinIndex + 1) % availableSkins.size();
                 String newSkin = availableSkins.get(currentSkinIndex);
                 profileList.getSelected().getProfile().setSkinId(newSkin);
-                b.setMessage(Component.literal("Skin: " + (newSkin.isEmpty() ? "Default" : newSkin)));
+                b.setMessage(Component.literal("Skin: " + newSkin));
             }
         }).bounds(centerX - (editorWidth / 2), centerY - 40, editorWidth, 20).build();
         this.addRenderableWidget(this.skinDropdownBtn);
@@ -147,13 +149,13 @@ public class NPCManagementScreen extends Screen {
     }
 
     private boolean hasEditableSelected() {
-        return profileList.getSelected() != null && !profileList.getSelected().getProfile().getId().equals(NPCProfileManager.STEVE_PROFILE_ID) && !profileList.getSelected().getProfile().getId().equals(NPCProfileManager.ALEX_PROFILE_ID);
+        return profileList.getSelected() != null && !profileList.getSelected().getProfile().getId().equals(NPCProfileManager.DEFAULT_PROFILE_ID);
     }
 
     private void createNewProfile() {
         String id = UUID.randomUUID().toString();
         String defaultName = "New NPC";
-        String skinId = "";
+        String skinId = "steve";
 
         String expectedSkinName = defaultName.toLowerCase().replace(" ", "_");
         if (availableSkins.contains(expectedSkinName)) {
@@ -182,13 +184,13 @@ public class NPCManagementScreen extends Screen {
             this.nameEditBox.setValue(p.getName());
 
             this.currentSkinIndex = Math.max(0, availableSkins.indexOf(p.getSkinId()));
-            this.skinDropdownBtn.setMessage(Component.literal("Skin: " + (p.getSkinId() != null && !p.getSkinId().isEmpty() ? p.getSkinId() : "Default")));
+            this.skinDropdownBtn.setMessage(Component.literal("Skin: " + (p.getSkinId() != null && !p.getSkinId().isEmpty() ? p.getSkinId() : "steve")));
 
             this.toggleModelBtn.setMessage(Component.literal("Model: " + (p.isSlim() ? "Slim" : "Classic")));
             this.toggleEnableBtn.setMessage(Component.literal("Enabled: " + (p.isEnabled() ? "Yes" : "No")));
         } else {
             this.nameEditBox.setValue("");
-            this.skinDropdownBtn.setMessage(Component.literal("Skin: Default"));
+            this.skinDropdownBtn.setMessage(Component.literal("Skin: steve"));
         }
     }
 
@@ -200,8 +202,8 @@ public class NPCManagementScreen extends Screen {
 
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 10, 16777215);
 
-        int listWidth = Math.max(100, (int)(this.width * 0.2));
-        int previewWidth = Math.max(120, (int)(this.width * 0.25));
+        int listWidth = Math.max(120, (int)(this.width * 0.3));
+        int previewWidth = Math.max(120, (int)(this.width * 0.3));
 
         guiGraphics.fill(listWidth, 0, listWidth + 1, this.height, 0x80FFFFFF);
         guiGraphics.fill(this.width - previewWidth, 0, this.width - previewWidth + 1, this.height, 0x80FFFFFF);
@@ -226,9 +228,10 @@ public class NPCManagementScreen extends Screen {
         poseStack.translate(0.0D, 0.0D, 1000.0D);
         poseStack.scale((float)scale, (float)scale, (float)scale);
 
-        Quaternionf quaternionf = Axis.ZP.rotationDegrees(180.0F);
-        Quaternionf quaternionf1 = Axis.XP.rotationDegrees(rotY * 20.0F);
-        quaternionf.mul(quaternionf1);
+        // Correct humanoid orientation for raw model rendering
+        poseStack.scale(-1.0F, -1.0F, 1.0F);
+
+        org.joml.Quaternionf quaternionf = com.mojang.math.Axis.XP.rotationDegrees(rotY * 20.0F);
         poseStack.mulPose(quaternionf);
 
         PlayerModel<?> activeModel = profile.isSlim() ? this.slimModel : this.classicModel;
@@ -263,10 +266,9 @@ public class NPCManagementScreen extends Screen {
 
         public void refreshList() {
             this.clearEntries();
-            this.addEntry(new Entry(NPCProfileManager.STEVE_PROFILE));
-            this.addEntry(new Entry(NPCProfileManager.ALEX_PROFILE));
+            this.addEntry(new Entry(NPCProfileManager.DEFAULT_PROFILE));
             for (NPCProfile profile : NPCProfileManager.getProfiles().values()) {
-                if (!profile.getId().equals(NPCProfileManager.STEVE_PROFILE_ID) && !profile.getId().equals(NPCProfileManager.ALEX_PROFILE_ID)) {
+                if (!profile.getId().equals(NPCProfileManager.DEFAULT_PROFILE_ID)) {
                     this.addEntry(new Entry(profile));
                 }
             }
@@ -292,8 +294,8 @@ public class NPCManagementScreen extends Screen {
             @Override
             public void render(GuiGraphics guiGraphics, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean isHovered, float partialTick) {
                 String label = profile.getName();
-                if (profile.getId().equals(NPCProfileManager.STEVE_PROFILE_ID) || profile.getId().equals(NPCProfileManager.ALEX_PROFILE_ID)) {
-                    label = "[" + profile.getName() + "]";
+                if (profile.getId().equals(NPCProfileManager.DEFAULT_PROFILE_ID)) {
+                    label = "[Default]";
                 }
                 guiGraphics.drawString(font, label, left + 5, top + 5, 0xFFFFFF);
             }
