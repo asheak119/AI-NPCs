@@ -66,23 +66,24 @@ public class NPCManagementScreen extends Screen {
     protected void init() {
         super.init();
 
-        int listWidth = Math.max(120, (int)(this.width * 0.3));
-        int editorStartX = listWidth + 20;
-        int editorWidth = Math.min(200, this.width - listWidth - 40);
-        int centerX = editorStartX + (editorWidth / 2);
+        int listWidth = Math.max(100, (int)(this.width * 0.2));
+        int previewWidth = Math.max(120, (int)(this.width * 0.25));
+
+        int centerAreaWidth = this.width - listWidth - previewWidth;
+        int editorWidth = Math.min(180, centerAreaWidth - 20);
+        int centerX = listWidth + (centerAreaWidth / 2);
         int centerY = this.height / 2;
 
         this.classicModel = new PlayerModel<>(this.minecraft.getEntityModels().bakeLayer(ModelLayers.PLAYER), false);
         this.slimModel = new PlayerModel<>(this.minecraft.getEntityModels().bakeLayer(ModelLayers.PLAYER_SLIM), true);
 
-        // List takes up the left side, scrolling area
         this.profileList = new ProfileList(this.minecraft, listWidth, this.height, 40, this.height - 40, 25);
         this.addRenderableWidget(this.profileList);
 
         this.addRenderableWidget(Button.builder(Component.literal("New NPC"), b -> createNewProfile())
                 .bounds(10, 10, listWidth - 20, 20).build());
 
-        this.nameEditBox = new EditBox(this.font, centerX - (editorWidth / 2), centerY - 60, editorWidth, 20, Component.literal("Name"));
+        this.nameEditBox = new EditBox(this.font, centerX - (editorWidth / 2), centerY - 70, editorWidth, 20, Component.literal("Name"));
         this.nameEditBox.setResponder(s -> {
             if (hasEditableSelected()) {
                 profileList.getSelected().getProfile().setName(s);
@@ -97,7 +98,7 @@ public class NPCManagementScreen extends Screen {
                 profileList.getSelected().getProfile().setSkinId(newSkin);
                 b.setMessage(Component.literal("Skin: " + (newSkin.isEmpty() ? "Default" : newSkin)));
             }
-        }).bounds(centerX - (editorWidth / 2), centerY - 30, editorWidth, 20).build();
+        }).bounds(centerX - (editorWidth / 2), centerY - 40, editorWidth, 20).build();
         this.addRenderableWidget(this.skinDropdownBtn);
 
         this.toggleModelBtn = Button.builder(Component.literal("Model: Classic"), b -> {
@@ -106,7 +107,7 @@ public class NPCManagementScreen extends Screen {
                 p.setSlim(!p.isSlim());
                 b.setMessage(Component.literal("Model: " + (p.isSlim() ? "Slim" : "Classic")));
             }
-        }).bounds(centerX - (editorWidth / 2), centerY, editorWidth, 20).build();
+        }).bounds(centerX - (editorWidth / 2), centerY - 10, editorWidth, 20).build();
         this.addRenderableWidget(this.toggleModelBtn);
 
         this.toggleEnableBtn = Button.builder(Component.literal("Enabled: Yes"), b -> {
@@ -115,7 +116,7 @@ public class NPCManagementScreen extends Screen {
                 p.setEnabled(!p.isEnabled());
                 b.setMessage(Component.literal("Enabled: " + (p.isEnabled() ? "Yes" : "No")));
             }
-        }).bounds(centerX - (editorWidth / 2), centerY + 30, editorWidth, 20).build();
+        }).bounds(centerX - (editorWidth / 2), centerY + 20, editorWidth, 20).build();
         this.addRenderableWidget(this.toggleEnableBtn);
 
         this.deleteBtn = Button.builder(Component.literal("Delete"), b -> {
@@ -126,11 +127,11 @@ public class NPCManagementScreen extends Screen {
                         Component.literal("Deleting this NPC profile will permanently remove it and despawn all existing instances currently in your worlds. Are you sure you want to proceed?")
                 ));
             }
-        }).bounds(centerX - (editorWidth / 2), centerY + 60, editorWidth, 20).build();
+        }).bounds(centerX - (editorWidth / 2), centerY + 50, editorWidth, 20).build();
         this.addRenderableWidget(this.deleteBtn);
 
         Button doneBtn = Button.builder(Component.literal("Done"), b -> this.onClose())
-                .bounds(this.width - 110, this.height - 30, 100, 20).build();
+                .bounds(this.width - previewWidth - 100, this.height - 30, 90, 20).build();
         this.addRenderableWidget(doneBtn);
 
         updateEditorFields();
@@ -146,7 +147,7 @@ public class NPCManagementScreen extends Screen {
     }
 
     private boolean hasEditableSelected() {
-        return profileList.getSelected() != null && !profileList.getSelected().getProfile().getId().equals(NPCProfileManager.DEFAULT_PROFILE_ID);
+        return profileList.getSelected() != null && !profileList.getSelected().getProfile().getId().equals(NPCProfileManager.STEVE_PROFILE_ID) && !profileList.getSelected().getProfile().getId().equals(NPCProfileManager.ALEX_PROFILE_ID);
     }
 
     private void createNewProfile() {
@@ -199,9 +200,18 @@ public class NPCManagementScreen extends Screen {
 
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 10, 16777215);
 
+        int listWidth = Math.max(100, (int)(this.width * 0.2));
+        int previewWidth = Math.max(120, (int)(this.width * 0.25));
+
+        guiGraphics.fill(listWidth, 0, listWidth + 1, this.height, 0x80FFFFFF);
+        guiGraphics.fill(this.width - previewWidth, 0, this.width - previewWidth + 1, this.height, 0x80FFFFFF);
+
         if (profileList.getSelected() != null) {
             NPCProfile p = profileList.getSelected().getProfile();
-            renderPreview(guiGraphics, this.width / 2 - 60, this.height / 2 + 50, 45, mouseX, mouseY, p);
+
+            int renderX = this.width - (previewWidth / 2);
+            int renderY = this.height / 2 + 50;
+            renderPreview(guiGraphics, renderX, renderY, 50, mouseX, mouseY, p);
         }
     }
 
@@ -253,9 +263,10 @@ public class NPCManagementScreen extends Screen {
 
         public void refreshList() {
             this.clearEntries();
-            this.addEntry(new Entry(NPCProfileManager.DEFAULT_PROFILE));
+            this.addEntry(new Entry(NPCProfileManager.STEVE_PROFILE));
+            this.addEntry(new Entry(NPCProfileManager.ALEX_PROFILE));
             for (NPCProfile profile : NPCProfileManager.getProfiles().values()) {
-                if (!profile.getId().equals(NPCProfileManager.DEFAULT_PROFILE_ID)) {
+                if (!profile.getId().equals(NPCProfileManager.STEVE_PROFILE_ID) && !profile.getId().equals(NPCProfileManager.ALEX_PROFILE_ID)) {
                     this.addEntry(new Entry(profile));
                 }
             }
@@ -281,8 +292,8 @@ public class NPCManagementScreen extends Screen {
             @Override
             public void render(GuiGraphics guiGraphics, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean isHovered, float partialTick) {
                 String label = profile.getName();
-                if (profile.getId().equals(NPCProfileManager.DEFAULT_PROFILE_ID)) {
-                    label = "[Default]";
+                if (profile.getId().equals(NPCProfileManager.STEVE_PROFILE_ID) || profile.getId().equals(NPCProfileManager.ALEX_PROFILE_ID)) {
+                    label = "[" + profile.getName() + "]";
                 }
                 guiGraphics.drawString(font, label, left + 5, top + 5, 0xFFFFFF);
             }

@@ -105,7 +105,7 @@ public class NpcEntity extends PathfinderMob {
         if (!this.level().isClientSide() && this.tickCount % 20 == 0) {
             String variant = this.getVariant();
             // If the profile was deleted from the manager (and it's not the default), discard the entity
-            if (!NPCProfileManager.DEFAULT_PROFILE_ID.equals(variant) && NPCProfileManager.getProfiles().get(variant) == null) {
+            if (!NPCProfileManager.STEVE_PROFILE_ID.equals(variant) && !NPCProfileManager.ALEX_PROFILE_ID.equals(variant) && NPCProfileManager.getProfiles().get(variant) == null) {
                 this.discard();
             }
         }
