@@ -3,6 +3,7 @@ package com.alexlego19.ainpcs.client.gui;
 import com.alexlego19.ainpcs.client.manager.DynamicSkinManager;
 import com.alexlego19.ainpcs.data.NPCProfile;
 import com.alexlego19.ainpcs.data.NPCProfileManager;
+import com.alexlego19.ainpcs.entity.NpcEntity;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
@@ -17,6 +18,7 @@ import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import org.joml.Quaternionf;
 import com.mojang.math.Axis;
@@ -41,6 +43,8 @@ public class NPCManagementScreen extends Screen {
 
     private PlayerModel<?> classicModel;
     private PlayerModel<?> slimModel;
+
+    private NpcEntity previewEntity;
 
     private NPCProfile selectedProfile;
     private boolean isDropdownOpen = false;
@@ -224,7 +228,7 @@ public class NPCManagementScreen extends Screen {
         // Preview Render inside the right 1/3 box
         int renderX = leftWidth + ((this.width - leftWidth) / 2);
         int renderY = (this.height - 40) / 2 + 80;
-        renderPreview(guiGraphics, renderX, renderY, 70, mouseX, mouseY, selectedProfile);
+
 
         // Draw dropdown list last so it renders over the content
         if (isDropdownOpen && profileList != null) {
@@ -233,37 +237,7 @@ public class NPCManagementScreen extends Screen {
         }
     }
 
-    private void renderPreview(GuiGraphics guiGraphics, int x, int y, int scale, float mouseX, float mouseY, NPCProfile profile) {
-        float rotX = (float)Math.atan((x - mouseX) / 40.0F);
-        float rotY = (float)Math.atan((y - 50 - mouseY) / 40.0F);
 
-        PoseStack poseStack = guiGraphics.pose();
-        poseStack.pushPose();
-        poseStack.translate(x, y, 1050.0D);
-
-        // This is the definitive fix for model inversion using standard Vanilla pattern
-        poseStack.scale((float)scale, (float)-scale, (float)scale);
-
-        Quaternionf quaternionf = Axis.XP.rotationDegrees(rotY * 20.0F);
-        poseStack.mulPose(quaternionf);
-
-        PlayerModel<?> activeModel = profile.isSlim() ? this.slimModel : this.classicModel;
-        activeModel.young = false;
-
-        activeModel.head.yRot = rotX * 40.0F * ((float)Math.PI / 180F);
-        activeModel.head.xRot = -rotY * 20.0F * ((float)Math.PI / 180F);
-        activeModel.hat.yRot = activeModel.head.yRot;
-        activeModel.hat.xRot = activeModel.head.xRot;
-        activeModel.body.yRot = rotX * 20.0F * ((float)Math.PI / 180F);
-
-        RenderSystem.setShaderLights(new org.joml.Vector3f(0.2F, 1.0F, -0.7F), new org.joml.Vector3f(-0.2F, 1.0F, 0.7F));
-
-        MultiBufferSource.BufferSource bufferSource = this.minecraft.renderBuffers().bufferSource();
-        activeModel.renderToBuffer(poseStack, bufferSource.getBuffer(activeModel.renderType(DynamicSkinManager.getSkin(profile.getSkinId(), profile.isSlim()))), LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F);
-        bufferSource.endBatch();
-
-        poseStack.popPose();
-    }
 
     @Override
     public void onClose() {
