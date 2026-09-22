@@ -3,12 +3,10 @@ package com.alexlego19.ainpcs.client.gui;
 import com.alexlego19.ainpcs.client.manager.DynamicSkinManager;
 import com.alexlego19.ainpcs.data.NPCProfile;
 import com.alexlego19.ainpcs.data.NPCProfileManager;
-import com.alexlego19.ainpcs.entity.NpcEntity;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ObjectSelectionList;
@@ -35,6 +33,7 @@ public class NPCManagementScreen extends Screen {
     private Button toggleModelBtn;
     private Button toggleEnableBtn;
     private Button deleteBtn;
+    private Button profileDropdownBtn;
     private ProfileList profileList;
 
     private List<String> availableSkins = new ArrayList<>();
@@ -43,13 +42,13 @@ public class NPCManagementScreen extends Screen {
     private PlayerModel<?> classicModel;
     private PlayerModel<?> slimModel;
 
-    private NpcEntity previewEntity;
-
     private NPCProfile selectedProfile;
+    private boolean isDropdownOpen = false;
+
     public NPCManagementScreen(Screen parent) {
         super(Component.literal("NPC Manager"));
         this.parent = parent;
-        this.selectedProfile = NPCProfileManager.STEVE_PROFILE;
+        this.selectedProfile = NPCProfileManager.DEFAULT_PROFILE;
         this.loadAvailableSkins();
     }
 
@@ -74,32 +73,41 @@ public class NPCManagementScreen extends Screen {
         this.classicModel = new PlayerModel<>(this.minecraft.getEntityModels().bakeLayer(ModelLayers.PLAYER), false);
         this.slimModel = new PlayerModel<>(this.minecraft.getEntityModels().bakeLayer(ModelLayers.PLAYER_SLIM), true);
 
-        if (this.previewEntity == null && this.minecraft.level != null) {
-            this.previewEntity = new com.alexlego19.ainpcs.entity.NpcEntity(com.alexlego19.ainpcs.init.EntityInit.NPC.get(), this.minecraft.level);
-        }
+        // Top Bar Dropdown Button
+        this.profileDropdownBtn = Button.builder(Component.literal("Profile: " + selectedProfile.getName()), b -> {
+            isDropdownOpen = !isDropdownOpen;
+            if (isDropdownOpen) {
+                if (!this.children().contains(profileList)) this.addRenderableWidget(profileList);
+            } else {
+                this.removeWidget(profileList);
+            }
+            if (profileList != null) {
 
-        // Layout Parameters
-        int listWidth = (int) (this.width * 0.28);
-        int previewWidth = (int) (this.width * 0.25);
-        int centerAreaWidth = this.width - listWidth - previewWidth;
-        int editorWidth = Math.min(180, centerAreaWidth - 20);
-        int centerX = listWidth + (centerAreaWidth / 2);
-        int centerY = this.height / 2;
+            }
+        }).bounds(10, 10, this.width - 130, 20).build();
+        this.addRenderableWidget(this.profileDropdownBtn);
 
         // Top Bar "New NPC" Button
         this.addRenderableWidget(Button.builder(Component.literal("New NPC"), b -> createNewProfile())
                 .bounds(this.width - 110, 10, 100, 20).build());
 
-        // Left Column (Profile List)
-        this.profileList = new ProfileList(this.minecraft, listWidth - 20, this.height, 45, this.height - 40, 25);
+        // Profile List (Hidden by default, shown when dropdown clicked)
+        this.profileList = new ProfileList(this.minecraft, this.width - 130, this.height, 35, this.height - 40, 25);
         this.profileList.setLeftPos(10);
-        this.addRenderableWidget(this.profileList);
+        // Do not call this.addRenderableWidget(this.profileList) here; it gets added in the toggle button action.
 
-        // Center Column (Editor Controls)
+
+
+        int leftPanelWidth = (int) (this.width * 0.66);
+        int centerX = leftPanelWidth / 2;
+        int centerY = (this.height - 40) / 2 + 20;
+        int editorWidth = Math.min(200, leftPanelWidth - 40);
+
         this.nameEditBox = new EditBox(this.font, centerX - (editorWidth / 2), centerY - 70, editorWidth, 20, Component.literal("Name"));
         this.nameEditBox.setResponder(s -> {
             if (isEditable()) {
                 selectedProfile.setName(s);
+                updateDropdownLabel();
             }
         });
         this.addRenderableWidget(this.nameEditBox);
@@ -148,14 +156,21 @@ public class NPCManagementScreen extends Screen {
         updateEditorFields();
     }
 
+    private void updateDropdownLabel() {
+        if (this.profileDropdownBtn != null) {
+            String label = selectedProfile.getId().equals(NPCProfileManager.DEFAULT_PROFILE_ID) ? "[Default]" : selectedProfile.getName();
+            this.profileDropdownBtn.setMessage(Component.literal("Profile: " + label));
+        }
+    }
+
     private boolean isEditable() {
-        return selectedProfile != null && !selectedProfile.getId().equals(NPCProfileManager.STEVE_PROFILE_ID) && !selectedProfile.getId().equals(NPCProfileManager.ALEX_PROFILE_ID);
+        return selectedProfile != null && !selectedProfile.getId().equals(NPCProfileManager.DEFAULT_PROFILE_ID);
     }
 
     private void confirmDelete(boolean confirmed) {
         if (confirmed && isEditable()) {
             NPCProfileManager.removeProfile(selectedProfile.getId());
-            this.selectedProfile = NPCProfileManager.STEVE_PROFILE;
+            this.selectedProfile = NPCProfileManager.DEFAULT_PROFILE;
             profileList.refreshList();
         }
         this.minecraft.setScreen(this);
@@ -177,12 +192,14 @@ public class NPCManagementScreen extends Screen {
         this.selectedProfile = newProfile;
 
         this.profileList.refreshList();
+        this.isDropdownOpen = false;
 
 
         updateEditorFields();
     }
 
     private void updateEditorFields() {
+        updateDropdownLabel();
         boolean editable = isEditable();
 
         this.nameEditBox.active = editable;
@@ -200,72 +217,58 @@ public class NPCManagementScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // Draw the top bar using the vanilla dirt background logic by drawing a texture
         guiGraphics.blit(new net.minecraft.resources.ResourceLocation("textures/gui/options_background.png"), 0, 0, 0, 0.0F, 0.0F, this.width, 40, 32, 32);
 
-        int listWidth = (int) (this.width * 0.28);
-        int previewWidth = (int) (this.width * 0.25);
-        int previewLeft = this.width - previewWidth;
-
-        guiGraphics.fill(0, 40, listWidth, this.height, 0xFF202020);
-        guiGraphics.fill(listWidth, 40, previewLeft, this.height, 0xFF101010);
+        // Draw the dark lower sections (Left 2/3 and Right 1/3 with no dividing line)
+        int leftWidth = (int) (this.width * 0.66);
+        guiGraphics.fill(0, 40, this.width, this.height, 0xFF101010); // Solid dark gray for the entire lower section
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
-        if (selectedProfile != null) {
-            int renderX = previewLeft + (previewWidth / 2);
-            int renderY = this.height - 60; // Anchor to feet
+        // Preview Render inside the right 1/3 box
+        int renderX = leftWidth + ((this.width - leftWidth) / 2);
+        int renderY = (this.height - 40) / 2 + 80;
+        renderPreview(guiGraphics, renderX, renderY, 70, mouseX, mouseY, selectedProfile);
 
-            guiGraphics.fill(previewLeft + 10, 60, this.width - 10, this.height - 20, 0x88000000);
-
-            if (previewEntity != null) {
-                previewEntity.setSlim(selectedProfile.isSlim());
-                previewEntity.setVariant(selectedProfile.getId());
-                previewEntity.setYRot(0.0F);
-                previewEntity.setXRot(0.0F);
-                previewEntity.yBodyRot = 0.0F;
-                previewEntity.yHeadRot = 0.0F;
-                previewEntity.yHeadRotO = 0.0F;
-            }
-
-            guiGraphics.enableScissor(previewLeft + 10, 60, this.width - 10, this.height - 20);
-
-            float mouseXRot = (float)Math.atan((renderX - mouseX) / 40.0f);
-            float mouseYRot = (float)Math.atan((renderY - mouseY - 100) / 40.0f);
-
-            PoseStack poseStack = guiGraphics.pose();
-            poseStack.pushPose();
-            poseStack.translate(renderX, renderY, 1050.0F);
-            // Fix upside-down issue: Scale positively, flip with ZP
-            poseStack.scale(70.0F, 70.0F, 70.0F);
-            poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
-            poseStack.mulPose(Axis.XP.rotationDegrees(mouseYRot * 20.0F));
-            poseStack.mulPose(Axis.YP.rotationDegrees(mouseXRot * 20.0F));
-
-            PlayerModel<NpcEntity> model = (PlayerModel<NpcEntity>) (selectedProfile.isSlim() ? slimModel : classicModel);
-            model.young = false;
-
-            if (previewEntity != null) {
-                model.setupAnim(previewEntity, 0.0F, 0.0F, this.minecraft.player != null ? this.minecraft.player.tickCount + partialTick : 0.0F, mouseXRot * 20.0F, mouseYRot * 20.0F);
-            } else {
-                model.setupAnim(null, 0.0F, 0.0F, 0.0F, mouseXRot * 20.0F, mouseYRot * 20.0F);
-            }
-
-            MultiBufferSource.BufferSource bufferSource = this.minecraft.renderBuffers().bufferSource();
-            ResourceLocation skinLocation = DynamicSkinManager.getSkin(selectedProfile.getSkinId(), selectedProfile.isSlim());
-            if (skinLocation == null) {
-                skinLocation = new ResourceLocation("minecraft", "textures/entity/steve.png");
-            }
-
-            com.mojang.blaze3d.vertex.VertexConsumer vertexConsumer = bufferSource.getBuffer(model.renderType(skinLocation));
-            model.renderToBuffer(poseStack, vertexConsumer, 15728880, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F);
-            bufferSource.endBatch();
-
-            poseStack.popPose();
-            guiGraphics.disableScissor();
+        // Draw dropdown list last so it renders over the content
+        if (isDropdownOpen && profileList != null) {
+            guiGraphics.fill(10, 35, this.width - 120, this.height - 40, 0xFF000000); // Draw solid black background behind the dropdown
+            // profileList handles its own render in super.render now since it's dynamically added to renderables
         }
     }
 
+    private void renderPreview(GuiGraphics guiGraphics, int x, int y, int scale, float mouseX, float mouseY, NPCProfile profile) {
+        float rotX = (float)Math.atan((x - mouseX) / 40.0F);
+        float rotY = (float)Math.atan((y - 50 - mouseY) / 40.0F);
 
+        PoseStack poseStack = guiGraphics.pose();
+        poseStack.pushPose();
+        poseStack.translate(x, y, 1050.0D);
+
+        // This is the definitive fix for model inversion using standard Vanilla pattern
+        poseStack.scale((float)scale, (float)-scale, (float)scale);
+
+        Quaternionf quaternionf = Axis.XP.rotationDegrees(rotY * 20.0F);
+        poseStack.mulPose(quaternionf);
+
+        PlayerModel<?> activeModel = profile.isSlim() ? this.slimModel : this.classicModel;
+        activeModel.young = false;
+
+        activeModel.head.yRot = rotX * 40.0F * ((float)Math.PI / 180F);
+        activeModel.head.xRot = -rotY * 20.0F * ((float)Math.PI / 180F);
+        activeModel.hat.yRot = activeModel.head.yRot;
+        activeModel.hat.xRot = activeModel.head.xRot;
+        activeModel.body.yRot = rotX * 20.0F * ((float)Math.PI / 180F);
+
+        RenderSystem.setShaderLights(new org.joml.Vector3f(0.2F, 1.0F, -0.7F), new org.joml.Vector3f(-0.2F, 1.0F, 0.7F));
+
+        MultiBufferSource.BufferSource bufferSource = this.minecraft.renderBuffers().bufferSource();
+        activeModel.renderToBuffer(poseStack, bufferSource.getBuffer(activeModel.renderType(DynamicSkinManager.getSkin(profile.getSkinId(), profile.isSlim()))), LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F);
+        bufferSource.endBatch();
+
+        poseStack.popPose();
+    }
 
     @Override
     public void onClose() {
@@ -282,10 +285,9 @@ public class NPCManagementScreen extends Screen {
 
         public void refreshList() {
             this.clearEntries();
-            this.addEntry(new Entry(NPCProfileManager.STEVE_PROFILE));
-            this.addEntry(new Entry(NPCProfileManager.ALEX_PROFILE));
+            this.addEntry(new Entry(NPCProfileManager.DEFAULT_PROFILE));
             for (NPCProfile profile : NPCProfileManager.getProfiles().values()) {
-                if (!profile.getId().equals(NPCProfileManager.STEVE_PROFILE_ID) && !profile.getId().equals(NPCProfileManager.ALEX_PROFILE_ID)) {
+                if (!profile.getId().equals(NPCProfileManager.DEFAULT_PROFILE_ID)) {
                     this.addEntry(new Entry(profile));
                 }
             }
@@ -301,8 +303,8 @@ public class NPCManagementScreen extends Screen {
             @Override
             public void render(GuiGraphics guiGraphics, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean isHovered, float partialTick) {
                 String label = profile.getName();
-                if (profile.getId().equals(NPCProfileManager.STEVE_PROFILE_ID) || profile.getId().equals(NPCProfileManager.ALEX_PROFILE_ID)) {
-                    label = "[" + profile.getName() + "]";
+                if (profile.getId().equals(NPCProfileManager.DEFAULT_PROFILE_ID)) {
+                    label = "[Default]";
                 }
                 guiGraphics.drawString(font, label, left + 5, top + 5, 0xFFFFFF);
             }
@@ -310,6 +312,7 @@ public class NPCManagementScreen extends Screen {
             @Override
             public boolean mouseClicked(double mouseX, double mouseY, int button) {
                 selectedProfile = profile;
+                isDropdownOpen = false;
 
                 updateEditorFields();
                 return true;
