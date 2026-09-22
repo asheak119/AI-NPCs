@@ -3,6 +3,8 @@ package com.alexlego19.ainpcs.client.gui;
 import com.alexlego19.ainpcs.client.manager.DynamicSkinManager;
 import com.alexlego19.ainpcs.data.NPCProfile;
 import com.alexlego19.ainpcs.data.NPCProfileManager;
+import com.alexlego19.ainpcs.data.Temperament;
+import com.alexlego19.ainpcs.data.Fortitude;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
@@ -32,6 +34,8 @@ public class NPCManagementScreen extends Screen {
     private Button skinDropdownBtn;
     private Button toggleModelBtn;
     private Button toggleEnableBtn;
+    private Button temperamentBtn;
+    private Button fortitudeBtn;
     private Button deleteBtn;
     private Button doneBtn;
     private Button profileDropdownBtn;
@@ -97,7 +101,7 @@ public class NPCManagementScreen extends Screen {
         int centerY = (this.height - 40) / 2 + 20;
         int editorWidth = Math.min(200, leftPanelWidth - 40);
 
-        this.nameEditBox = new EditBox(this.font, centerX - (editorWidth / 2), centerY - 70, editorWidth, 20, Component.literal("Name"));
+        this.nameEditBox = new EditBox(this.font, centerX - (editorWidth / 2), centerY - 90, editorWidth, 20, Component.literal("Name"));
         this.nameEditBox.setResponder(s -> {
             if (isEditable()) {
                 selectedProfile.setName(s);
@@ -113,7 +117,7 @@ public class NPCManagementScreen extends Screen {
                 selectedProfile.setSkinId(newSkin);
                 b.setMessage(Component.literal("Skin: " + newSkin));
             }
-        }).bounds(centerX - (editorWidth / 2), centerY - 40, editorWidth, 20).build();
+        }).bounds(centerX - (editorWidth / 2), centerY - 60, editorWidth, 20).build();
         this.addRenderableWidget(this.skinDropdownBtn);
 
         this.toggleModelBtn = Button.builder(Component.literal("Model: Slim"), b -> {
@@ -121,7 +125,7 @@ public class NPCManagementScreen extends Screen {
                 selectedProfile.setSlim(!selectedProfile.isSlim());
                 b.setMessage(Component.literal("Model: " + (selectedProfile.isSlim() ? "Slim" : "Classic")));
             }
-        }).bounds(centerX - (editorWidth / 2), centerY - 10, editorWidth, 20).build();
+        }).bounds(centerX - (editorWidth / 2), centerY - 30, editorWidth, 20).build();
         this.addRenderableWidget(this.toggleModelBtn);
 
         this.toggleEnableBtn = Button.builder(Component.literal("Enabled: Yes"), b -> {
@@ -129,8 +133,28 @@ public class NPCManagementScreen extends Screen {
                 selectedProfile.setEnabled(!selectedProfile.isEnabled());
                 b.setMessage(Component.literal("Enabled: " + (selectedProfile.isEnabled() ? "Yes" : "No")));
             }
-        }).bounds(centerX - (editorWidth / 2), centerY + 20, editorWidth, 20).build();
+        }).bounds(centerX - (editorWidth / 2), centerY, editorWidth, 20).build();
         this.addRenderableWidget(this.toggleEnableBtn);
+
+        this.temperamentBtn = Button.builder(Component.literal("Temperament: Passive"), b -> {
+            if (isEditable()) {
+                Temperament[] vals = Temperament.values();
+                int idx = (selectedProfile.getTemperament().ordinal() + 1) % vals.length;
+                selectedProfile.setTemperament(vals[idx]);
+                b.setMessage(Component.literal("Temperament: " + selectedProfile.getTemperament().getDisplayName()));
+            }
+        }).bounds(centerX - (editorWidth / 2), centerY + 30, editorWidth, 20).build();
+        this.addRenderableWidget(this.temperamentBtn);
+
+        this.fortitudeBtn = Button.builder(Component.literal("Fortitude: Medium"), b -> {
+            if (isEditable()) {
+                Fortitude[] vals = Fortitude.values();
+                int idx = (selectedProfile.getFortitude().ordinal() + 1) % vals.length;
+                selectedProfile.setFortitude(vals[idx]);
+                b.setMessage(Component.literal("Fortitude: " + selectedProfile.getFortitude().getDisplayName()));
+            }
+        }).bounds(centerX - (editorWidth / 2), centerY + 60, editorWidth, 20).build();
+        this.addRenderableWidget(this.fortitudeBtn);
 
         this.deleteBtn = Button.builder(Component.literal("Delete"), b -> {
             if (isEditable()) {
@@ -140,7 +164,7 @@ public class NPCManagementScreen extends Screen {
                         Component.literal("Deleting this NPC profile will permanently remove it and despawn all existing instances. Are you sure you want to proceed?")
                 ));
             }
-        }).bounds(centerX - (editorWidth / 2), centerY + 50, editorWidth, 20).build();
+        }).bounds(centerX - (editorWidth / 2), centerY + 90, editorWidth, 20).build();
         this.addRenderableWidget(this.deleteBtn);
 
         this.doneBtn = Button.builder(Component.literal("Done"), b -> this.onClose())
@@ -195,6 +219,8 @@ public class NPCManagementScreen extends Screen {
         this.skinDropdownBtn.active = editable;
         this.toggleModelBtn.active = editable;
         this.toggleEnableBtn.active = editable;
+        this.temperamentBtn.active = editable;
+        this.fortitudeBtn.active = editable;
         this.deleteBtn.active = editable;
 
         this.nameEditBox.setValue(selectedProfile.getName());
@@ -202,6 +228,10 @@ public class NPCManagementScreen extends Screen {
         this.skinDropdownBtn.setMessage(Component.literal("Skin: " + (selectedProfile.getSkinId() != null && !selectedProfile.getSkinId().isEmpty() ? selectedProfile.getSkinId() : "alex")));
         this.toggleModelBtn.setMessage(Component.literal("Model: " + (selectedProfile.isSlim() ? "Slim" : "Classic")));
         this.toggleEnableBtn.setMessage(Component.literal("Enabled: " + (selectedProfile.isEnabled() ? "Yes" : "No")));
+        if (selectedProfile.getTemperament() == null) selectedProfile.setTemperament(Temperament.PASSIVE);
+        if (selectedProfile.getFortitude() == null) selectedProfile.setFortitude(Fortitude.MEDIUM);
+        this.temperamentBtn.setMessage(Component.literal("Temperament: " + selectedProfile.getTemperament().getDisplayName()));
+        this.fortitudeBtn.setMessage(Component.literal("Fortitude: " + selectedProfile.getFortitude().getDisplayName()));
     }
 
     @Override

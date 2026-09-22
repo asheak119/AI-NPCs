@@ -83,6 +83,7 @@ public class AiNpcsMod
     private void commonSetup(final FMLCommonSetupEvent event)
     {
         NPCProfileManager.load();
+        com.alexlego19.ainpcs.network.PacketHandler.register();
         // Some common setup code
         LOGGER.info("HELLO FROM COMMON SETUP");
 
