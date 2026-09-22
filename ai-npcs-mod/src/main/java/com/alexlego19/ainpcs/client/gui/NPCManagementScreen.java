@@ -35,7 +35,6 @@ public class NPCManagementScreen extends Screen {
     private Button deleteBtn;
     private Button doneBtn;
     private Button profileDropdownBtn;
-    private ProfileList profileList;
 
     private List<String> availableSkins = new ArrayList<>();
     private int currentSkinIndex = 0;
@@ -44,7 +43,11 @@ public class NPCManagementScreen extends Screen {
     private PlayerModel<?> slimModel;
 
     private NPCProfile selectedProfile;
-    private boolean isDropdownOpen = false;
+
+    public void setSelectedProfile(NPCProfile profile) {
+        this.selectedProfile = profile;
+        this.updateEditorFields();
+    }
 
     public NPCManagementScreen(Screen parent) {
         super(Component.literal("NPC Manager"));
@@ -76,15 +79,7 @@ public class NPCManagementScreen extends Screen {
 
         // Top Bar Dropdown Button
         this.profileDropdownBtn = Button.builder(Component.literal("Profile: " + selectedProfile.getName()), b -> {
-            isDropdownOpen = !isDropdownOpen;
-            if (isDropdownOpen) {
-                if (!this.children().contains(profileList)) this.addRenderableWidget(profileList);
-            } else {
-                this.removeWidget(profileList);
-            }
-            if (profileList != null) {
-
-            }
+            this.minecraft.setScreen(new NPCProfileSelectionScreen(this, selectedProfile));
         }).bounds(10, 10, this.width - 130, 20).build();
         this.addRenderableWidget(this.profileDropdownBtn);
 
@@ -93,9 +88,7 @@ public class NPCManagementScreen extends Screen {
                 .bounds(this.width - 110, 10, 100, 20).build());
 
         // Profile List (Hidden by default, shown when dropdown clicked)
-        this.profileList = new ProfileList(this.minecraft, this.width - 130, this.height, 35, this.height - 40, 25);
-        this.profileList.setLeftPos(10);
-        // Do not call this.addRenderableWidget(this.profileList) here; it gets added in the toggle button action.
+                // Do not call this.addRenderableWidget(this.profileList) here; it gets added in the toggle button action.
 
 
 
@@ -172,8 +165,7 @@ public class NPCManagementScreen extends Screen {
         if (confirmed && isEditable()) {
             NPCProfileManager.removeProfile(selectedProfile.getId());
             this.selectedProfile = NPCProfileManager.DEFAULT_PROFILE;
-            profileList.refreshList();
-        }
+                    }
         this.minecraft.setScreen(this);
         updateEditorFields();
     }
@@ -192,8 +184,7 @@ public class NPCManagementScreen extends Screen {
         NPCProfileManager.addProfile(newProfile);
         this.selectedProfile = newProfile;
 
-        this.profileList.refreshList();
-        this.isDropdownOpen = false;
+        this.
 
 
         updateEditorFields();
@@ -225,27 +216,12 @@ public class NPCManagementScreen extends Screen {
         int leftWidth = (int) (this.width * 0.66);
         guiGraphics.fill(0, 40, this.width, this.height, 0xFF101010); // Solid dark gray for the entire lower section
 
-        // Toggle visibility of editor fields based on dropdown state
-        boolean controlsVisible = !isDropdownOpen;
-        this.nameEditBox.visible = controlsVisible;
-        this.skinDropdownBtn.visible = controlsVisible;
-        this.toggleModelBtn.visible = controlsVisible;
-        this.toggleEnableBtn.visible = controlsVisible;
-        this.deleteBtn.visible = controlsVisible;
-        if (this.doneBtn != null) this.doneBtn.visible = controlsVisible;
-
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
         // Preview Render inside the right 1/3 box
         int renderX = leftWidth + ((this.width - leftWidth) / 2);
         int renderY = (this.height - 40) / 2 + 80;
         renderPreview(guiGraphics, renderX, renderY, 70, mouseX, mouseY, selectedProfile);
-
-        // Draw dropdown list background if open
-        if (isDropdownOpen && profileList != null) {
-            guiGraphics.fill(10, 35, this.width - 120, this.height - 40, 0xFF000000); // Draw solid black background behind the dropdown
-            profileList.render(guiGraphics, mouseX, mouseY, partialTick);
-        }
     }
 
     private void renderPreview(GuiGraphics guiGraphics, int x, int y, int scale, float mouseX, float mouseY, NPCProfile profile) {
@@ -258,7 +234,7 @@ public class NPCManagementScreen extends Screen {
 
         // This is the definitive fix for model inversion using standard Vanilla pattern
         poseStack.scale((float)scale, (float)-scale, (float)scale);
-        // Flip the rendering matrix along the Y-axis so the entity faces the correct way
+        poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
         poseStack.mulPose(Axis.YP.rotationDegrees(180.0F));
 
         Quaternionf quaternionf = Axis.XP.rotationDegrees(rotY * 20.0F);
@@ -288,52 +264,4 @@ public class NPCManagementScreen extends Screen {
         this.minecraft.setScreen(this.parent);
     }
 
-    class ProfileList extends ObjectSelectionList<ProfileList.Entry> {
-        public ProfileList(Minecraft mc, int width, int height, int top, int bottom, int itemHeight) {
-            super(mc, width, height, top, bottom, itemHeight);
-            this.setRenderBackground(false);
-            refreshList();
-        }
-
-        public void refreshList() {
-            this.clearEntries();
-            this.addEntry(new Entry(NPCProfileManager.DEFAULT_PROFILE));
-            for (NPCProfile profile : NPCProfileManager.getProfiles().values()) {
-                if (!profile.getId().equals(NPCProfileManager.DEFAULT_PROFILE_ID)) {
-                    this.addEntry(new Entry(profile));
-                }
-            }
-        }
-
-        class Entry extends ObjectSelectionList.Entry<Entry> {
-            private final NPCProfile profile;
-
-            public Entry(NPCProfile profile) {
-                this.profile = profile;
-            }
-
-            @Override
-            public void render(GuiGraphics guiGraphics, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean isHovered, float partialTick) {
-                String label = profile.getName();
-                if (profile.getId().equals(NPCProfileManager.DEFAULT_PROFILE_ID)) {
-                    label = "[Default]";
-                }
-                guiGraphics.drawString(font, label, left + 5, top + 5, 0xFFFFFF);
-            }
-
-            @Override
-            public boolean mouseClicked(double mouseX, double mouseY, int button) {
-                selectedProfile = profile;
-                isDropdownOpen = false;
-
-                updateEditorFields();
-                return true;
-            }
-
-            @Override
-            public Component getNarration() {
-                return Component.literal(profile.getName());
-            }
-        }
     }
-}
