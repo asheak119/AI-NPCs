@@ -184,9 +184,6 @@ public class NPCManagementScreen extends Screen {
         NPCProfileManager.addProfile(newProfile);
         this.selectedProfile = newProfile;
 
-        this.
-
-
         updateEditorFields();
     }
 
@@ -220,40 +217,43 @@ public class NPCManagementScreen extends Screen {
 
         // Preview Render inside the right 1/3 box
         int renderX = leftWidth + ((this.width - leftWidth) / 2);
-        int renderY = (this.height - 40) / 2 + 80;
+        int renderY = (this.height - 40) / 2 + 10; // Moved further up
         renderPreview(guiGraphics, renderX, renderY, 70, mouseX, mouseY, selectedProfile);
     }
 
     private void renderPreview(GuiGraphics guiGraphics, int x, int y, int scale, float mouseX, float mouseY, NPCProfile profile) {
-        float rotX = (float)Math.atan((x - mouseX) / 40.0F);
-        float rotY = (float)Math.atan((y - 50 - mouseY) / 40.0F);
-
         PoseStack poseStack = guiGraphics.pose();
         poseStack.pushPose();
         poseStack.translate(x, y, 1050.0D);
 
         // This is the definitive fix for model inversion using standard Vanilla pattern
         poseStack.scale((float)scale, (float)-scale, (float)scale);
-        poseStack.mulPose(Axis.ZP.rotationDegrees(180.0F));
-        poseStack.mulPose(Axis.YP.rotationDegrees(180.0F));
-
-        Quaternionf quaternionf = Axis.XP.rotationDegrees(rotY * 20.0F);
-        poseStack.mulPose(quaternionf);
+        poseStack.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(180.0F));
+        poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(180.0F));
 
         PlayerModel<?> activeModel = profile.isSlim() ? this.slimModel : this.classicModel;
         activeModel.young = false;
 
-        activeModel.head.yRot = rotX * 40.0F * ((float)Math.PI / 180F);
-        activeModel.head.xRot = -rotY * 20.0F * ((float)Math.PI / 180F);
-        activeModel.hat.yRot = activeModel.head.yRot;
-        activeModel.hat.xRot = activeModel.head.xRot;
-        activeModel.body.yRot = rotX * 20.0F * ((float)Math.PI / 180F);
+        // Static pose, looking straight ahead
+        activeModel.head.yRot = 0.0F;
+        activeModel.head.xRot = 0.0F;
+        activeModel.hat.yRot = 0.0F;
+        activeModel.hat.xRot = 0.0F;
+        activeModel.body.yRot = 0.0F;
+        activeModel.rightArm.xRot = 0.0F;
+        activeModel.leftArm.xRot = 0.0F;
+        activeModel.rightLeg.xRot = 0.0F;
+        activeModel.leftLeg.xRot = 0.0F;
 
-        RenderSystem.setShaderLights(new org.joml.Vector3f(0.2F, 1.0F, -0.7F), new org.joml.Vector3f(-0.2F, 1.0F, 0.7F));
+        // No directional lighting, use flat lighting
+        com.mojang.blaze3d.platform.Lighting.setupForFlatItems();
 
-        MultiBufferSource.BufferSource bufferSource = this.minecraft.renderBuffers().bufferSource();
-        activeModel.renderToBuffer(poseStack, bufferSource.getBuffer(activeModel.renderType(DynamicSkinManager.getSkin(profile.getSkinId(), profile.isSlim()))), LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F);
+        net.minecraft.client.renderer.MultiBufferSource.BufferSource bufferSource = this.minecraft.renderBuffers().bufferSource();
+        activeModel.renderToBuffer(poseStack, bufferSource.getBuffer(activeModel.renderType(DynamicSkinManager.getSkin(profile.getSkinId(), profile.isSlim()))), net.minecraft.client.renderer.LightTexture.FULL_BRIGHT, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F);
         bufferSource.endBatch();
+
+        // Restore normal 3D GUI lighting so we don't break other elements
+        com.mojang.blaze3d.platform.Lighting.setupFor3DItems();
 
         poseStack.popPose();
     }
