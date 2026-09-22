@@ -206,12 +206,26 @@ public class NPCManagementScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // Draw the top bar using the vanilla dirt background logic by drawing a texture
-        guiGraphics.blit(new net.minecraft.resources.ResourceLocation("textures/gui/options_background.png"), 0, 0, 0, 0.0F, 0.0F, this.width, 40, 32, 32);
+        this.renderBackground(guiGraphics);
 
-        // Draw the dark lower sections (Left 2/3 and Right 1/3 with no dividing line)
         int leftWidth = (int) (this.width * 0.66);
-        guiGraphics.fill(0, 40, this.width, this.height, 0xFF101010); // Solid dark gray for the entire lower section
+        net.minecraft.resources.ResourceLocation dirt = new net.minecraft.resources.ResourceLocation("textures/gui/options_background.png");
+
+        // Darker inset part for the middle options section
+        guiGraphics.setColor(0.125F, 0.125F, 0.125F, 1.0F);
+        guiGraphics.blit(dirt, 0, 40, 0, 0.0F, 40.0F, this.width, this.height - 80, 32, 32);
+
+        // Top Bar
+        guiGraphics.setColor(0.25F, 0.25F, 0.25F, 1.0F);
+        guiGraphics.blit(dirt, 0, 0, 0, 0.0F, 0.0F, this.width, 40, 32, 32);
+
+        // Bottom Bar
+        guiGraphics.blit(dirt, 0, this.height - 40, 0, 0.0F, (float)(this.height - 40), this.width, 40, 32, 32);
+        guiGraphics.setColor(1.0F, 1.0F, 1.0F, 1.0F); // Reset color
+
+        // Draw drop shadows for top and bottom bars
+        guiGraphics.fillGradient(0, 40, this.width, 44, 0xFF000000, 0x00000000);
+        guiGraphics.fillGradient(0, this.height - 44, this.width, this.height - 40, 0x00000000, 0xFF000000);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
