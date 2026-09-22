@@ -27,7 +27,7 @@ public class DynamicSkinManager {
 
     public static ResourceLocation getSkin(String skinId, boolean isSlim) {
         if (skinId == null || skinId.isEmpty()) {
-            return isSlim ? DefaultPlayerSkin.getDefaultSkin(ALEX_UUID) : DefaultPlayerSkin.getDefaultSkin(STEVE_UUID);
+            return DefaultPlayerSkin.getDefaultSkin(ALEX_UUID);
         }
 
         if (skinCache.containsKey(skinId)) {

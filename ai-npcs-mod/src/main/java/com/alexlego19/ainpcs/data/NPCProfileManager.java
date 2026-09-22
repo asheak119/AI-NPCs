@@ -25,7 +25,7 @@ public class NPCProfileManager {
     private static final File PROFILES_FILE = CONFIG_DIR.resolve("npcs.json").toFile();
 
     public static final String DEFAULT_PROFILE_ID = "default";
-    public static final NPCProfile DEFAULT_PROFILE = new NPCProfile(DEFAULT_PROFILE_ID, "Default", "steve", false, true);
+    public static final NPCProfile DEFAULT_PROFILE = new NPCProfile(DEFAULT_PROFILE_ID, "Default", "alex", true, true);
 
     private static Map<String, NPCProfile> profiles = new HashMap<>();
     private static final Random RANDOM = new Random();
