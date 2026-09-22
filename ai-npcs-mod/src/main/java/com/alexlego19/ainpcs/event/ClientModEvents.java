@@ -55,6 +55,28 @@ public class ClientModEvents {
             String msg = event.getMessage().getString();
             if (msg.startsWith("<") && msg.endsWith("> *thinking.*")) {
                 setInteractionStarted();
+            } else if (msg.startsWith("<") && !msg.contains("*thinking")) {
+                // If it's an NPC response, let's remove any thinking messages from that NPC
+                String namePart = msg.substring(0, msg.indexOf(">") + 1);
+                Minecraft mc = Minecraft.getInstance();
+                ChatComponent chat = mc.gui.getChat();
+                if (chat != null && chat.allMessages != null) {
+                    boolean removed = false;
+                    for (int i = 0; i < chat.allMessages.size(); i++) {
+                        GuiMessage m = chat.allMessages.get(i);
+                        if (m != null && m.content() != null) {
+                            String t = m.content().getString();
+                            if (t.startsWith(namePart) && t.contains("*thinking")) {
+                                chat.allMessages.remove(i);
+                                i--;
+                                removed = true;
+                            }
+                        }
+                    }
+                    if (removed) {
+                        chat.refreshTrimmedMessage();
+                    }
+                }
             }
         }
 

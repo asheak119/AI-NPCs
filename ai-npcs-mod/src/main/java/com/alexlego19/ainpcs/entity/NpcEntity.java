@@ -32,6 +32,10 @@ import com.alexlego19.ainpcs.data.Temperament;
 import com.alexlego19.ainpcs.data.Fortitude;
 import java.util.stream.Collectors;
 import net.minecraft.world.phys.AABB;
+import java.util.Map;
+import java.util.HashMap;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import java.util.UUID;
 import java.util.List;
 import java.util.ArrayList;
@@ -42,6 +46,20 @@ public class NpcEntity extends PathfinderMob {
     private List<UUID> audience = new ArrayList<>();
     private float accumulatedDamage = 0.0f;
     private int messageCount = 0;
+
+    private Map<UUID, Float> personalReputations = new HashMap<>();
+    private float communalReputation = 0.0f;
+    private float societalReputation = 0.0f;
+
+    public float getPersonalReputation(UUID playerUuid) {
+        return personalReputations.getOrDefault(playerUuid, 0.0f);
+    }
+
+    public void modifyPersonalReputation(UUID playerUuid, float amount) {
+        float current = getPersonalReputation(playerUuid);
+        float newRep = Math.max(-1.0f, Math.min(1.0f, current + amount));
+        personalReputations.put(playerUuid, newRep);
+    }
 
     public UUID getCurrentTarget() { return currentTarget; }
     public List<UUID> getAudience() { return audience; }
@@ -60,20 +78,36 @@ public class NpcEntity extends PathfinderMob {
     @Override
     public boolean hurt(DamageSource source, float amount) {
         if (!this.level().isClientSide() && source.getEntity() instanceof Player) {
+            Player attackingPlayer = (Player) source.getEntity();
+            modifyPersonalReputation(attackingPlayer.getUUID(), -amount * 0.1f);
+
             accumulatedDamage += amount;
             NPCProfile profile = NPCProfileManager.getProfile(this.getVariant());
             if (profile != null) {
                 float threshold = profile.getFortitude() != null ? profile.getFortitude().getDamageThreshold() : Fortitude.MEDIUM.getDamageThreshold();
                 if (accumulatedDamage >= threshold) {
                     Temperament temp = profile.getTemperament() != null ? profile.getTemperament() : Temperament.PASSIVE;
+                    String npcName = this.getCustomName() != null ? this.getCustomName().getString() : "NPC";
                     if (temp == Temperament.PASSIVE) {
                         if (this.goalSelector.getAvailableGoals().stream().noneMatch(g -> g.getGoal() instanceof PanicGoal)) {
                             this.goalSelector.addGoal(0, new PanicGoal(this, 1.25D));
+
+                            // Send scared disposition message
+                            net.minecraft.server.level.ServerPlayer targetP = (net.minecraft.server.level.ServerPlayer) source.getEntity();
+                            if (targetP != null) {
+                                targetP.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> Please don't hurt me! I'm getting out of here!"));
+                            }
                         }
                         this.setLastHurtByMob((net.minecraft.world.entity.LivingEntity) source.getEntity());
                     } else if (temp == Temperament.NEUTRAL) {
                         if (this.goalSelector.getAvailableGoals().stream().noneMatch(g -> g.getGoal() instanceof MeleeAttackGoal)) {
                             this.goalSelector.addGoal(0, new MeleeAttackGoal(this, 1.0D, true));
+
+                            // Send aggressive disposition message
+                            net.minecraft.server.level.ServerPlayer targetP = (net.minecraft.server.level.ServerPlayer) source.getEntity();
+                            if (targetP != null) {
+                                targetP.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> You'll pay for that!"));
+                            }
                         }
                         this.setTarget((net.minecraft.world.entity.LivingEntity) source.getEntity());
                     }
@@ -129,6 +163,18 @@ public class NpcEntity extends PathfinderMob {
         super.addAdditionalSaveData(tag);
         tag.putString("variant", this.getVariant());
         tag.putBoolean("IsSlim", this.isSlim());
+
+        tag.putFloat("CommunalReputation", this.communalReputation);
+        tag.putFloat("SocietalReputation", this.societalReputation);
+
+        ListTag repsTag = new ListTag();
+        for (Map.Entry<UUID, Float> entry : personalReputations.entrySet()) {
+            net.minecraft.nbt.CompoundTag repTag = new net.minecraft.nbt.CompoundTag();
+            repTag.putUUID("UUID", entry.getKey());
+            repTag.putFloat("Reputation", entry.getValue());
+            repsTag.add(repTag);
+        }
+        tag.put("PersonalReputations", repsTag);
     }
 
     @Override
@@ -141,6 +187,23 @@ public class NpcEntity extends PathfinderMob {
         }
         if (tag.contains("IsSlim")) {
             this.setSlim(tag.getBoolean("IsSlim"));
+        }
+
+        if (tag.contains("CommunalReputation")) {
+            this.communalReputation = tag.getFloat("CommunalReputation");
+        }
+        if (tag.contains("SocietalReputation")) {
+            this.societalReputation = tag.getFloat("SocietalReputation");
+        }
+
+        if (tag.contains("PersonalReputations", Tag.TAG_LIST)) {
+            ListTag repsTag = tag.getList("PersonalReputations", Tag.TAG_COMPOUND);
+            for (int i = 0; i < repsTag.size(); i++) {
+                net.minecraft.nbt.CompoundTag repTag = repsTag.getCompound(i);
+                if (repTag.hasUUID("UUID")) {
+                    personalReputations.put(repTag.getUUID("UUID"), repTag.getFloat("Reputation"));
+                }
+            }
         }
     }
 
