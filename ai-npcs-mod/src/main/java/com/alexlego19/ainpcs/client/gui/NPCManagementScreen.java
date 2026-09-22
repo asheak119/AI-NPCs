@@ -76,11 +76,6 @@ public class NPCManagementScreen extends Screen {
         // Top Bar Dropdown Button
         this.profileDropdownBtn = Button.builder(Component.literal("Profile: " + selectedProfile.getName()), b -> {
             isDropdownOpen = !isDropdownOpen;
-            if (isDropdownOpen) {
-                if (!this.children().contains(profileList)) this.addRenderableWidget(profileList);
-            } else {
-                this.removeWidget(profileList);
-            }
             if (profileList != null) {
 
             }
@@ -94,7 +89,7 @@ public class NPCManagementScreen extends Screen {
         // Profile List (Hidden by default, shown when dropdown clicked)
         this.profileList = new ProfileList(this.minecraft, this.width - 130, this.height, 35, this.height - 40, 25);
         this.profileList.setLeftPos(10);
-        // Do not call this.addRenderableWidget(this.profileList) here; it gets added in the toggle button action.
+        this.addWidget(this.profileList); // Add to children for clicks, but not renderables it gets added in the toggle button action.
 
 
 
@@ -233,8 +228,8 @@ public class NPCManagementScreen extends Screen {
 
         // Draw dropdown list last so it renders over the content
         if (isDropdownOpen && profileList != null) {
-            guiGraphics.fill(10, 35, this.width - 120, this.height - 40, 0xFF000000); // Draw solid black background behind the dropdown
-            // profileList handles its own render in super.render now since it's dynamically added to renderables
+            guiGraphics.fill(10, 35, this.width - 120, this.height - 40, 0xFF000000);
+            profileList.render(guiGraphics, mouseX, mouseY, partialTick);
         }
     }
 
