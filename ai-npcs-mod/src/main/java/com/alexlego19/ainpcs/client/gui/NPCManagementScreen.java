@@ -33,6 +33,7 @@ public class NPCManagementScreen extends Screen {
     private Button toggleModelBtn;
     private Button toggleEnableBtn;
     private Button deleteBtn;
+    private Button doneBtn;
     private Button profileDropdownBtn;
     private ProfileList profileList;
 
@@ -149,9 +150,9 @@ public class NPCManagementScreen extends Screen {
         }).bounds(centerX - (editorWidth / 2), centerY + 50, editorWidth, 20).build();
         this.addRenderableWidget(this.deleteBtn);
 
-        Button doneBtn = Button.builder(Component.literal("Done"), b -> this.onClose())
+        this.doneBtn = Button.builder(Component.literal("Done"), b -> this.onClose())
                 .bounds(this.width / 2 - 50, this.height - 30, 100, 20).build();
-        this.addRenderableWidget(doneBtn);
+        this.addRenderableWidget(this.doneBtn);
 
         updateEditorFields();
     }
@@ -224,6 +225,15 @@ public class NPCManagementScreen extends Screen {
         int leftWidth = (int) (this.width * 0.66);
         guiGraphics.fill(0, 40, this.width, this.height, 0xFF101010); // Solid dark gray for the entire lower section
 
+        // Toggle visibility of editor fields based on dropdown state
+        boolean controlsVisible = !isDropdownOpen;
+        this.nameEditBox.visible = controlsVisible;
+        this.skinDropdownBtn.visible = controlsVisible;
+        this.toggleModelBtn.visible = controlsVisible;
+        this.toggleEnableBtn.visible = controlsVisible;
+        this.deleteBtn.visible = controlsVisible;
+        if (this.doneBtn != null) this.doneBtn.visible = controlsVisible;
+
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
         // Preview Render inside the right 1/3 box
@@ -231,10 +241,10 @@ public class NPCManagementScreen extends Screen {
         int renderY = (this.height - 40) / 2 + 80;
         renderPreview(guiGraphics, renderX, renderY, 70, mouseX, mouseY, selectedProfile);
 
-        // Draw dropdown list last so it renders over the content
+        // Draw dropdown list background if open
         if (isDropdownOpen && profileList != null) {
             guiGraphics.fill(10, 35, this.width - 120, this.height - 40, 0xFF000000); // Draw solid black background behind the dropdown
-            // profileList handles its own render in super.render now since it's dynamically added to renderables
+            profileList.render(guiGraphics, mouseX, mouseY, partialTick);
         }
     }
 
@@ -248,6 +258,8 @@ public class NPCManagementScreen extends Screen {
 
         // This is the definitive fix for model inversion using standard Vanilla pattern
         poseStack.scale((float)scale, (float)-scale, (float)scale);
+        // Flip the rendering matrix along the Y-axis so the entity faces the correct way
+        poseStack.mulPose(Axis.YP.rotationDegrees(180.0F));
 
         Quaternionf quaternionf = Axis.XP.rotationDegrees(rotY * 20.0F);
         poseStack.mulPose(quaternionf);
