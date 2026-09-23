@@ -25,9 +25,99 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.ai.goal.PanicGoal;
+import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
+import com.alexlego19.ainpcs.data.Temperament;
+import com.alexlego19.ainpcs.data.Fortitude;
+import java.util.stream.Collectors;
+import net.minecraft.world.phys.AABB;
+import java.util.Map;
+import java.util.HashMap;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import java.util.UUID;
+import java.util.List;
+import java.util.ArrayList;
 import javax.annotation.Nullable;
 
 public class NpcEntity extends PathfinderMob {
+    private UUID currentTarget = null;
+    private List<UUID> audience = new ArrayList<>();
+    private float accumulatedDamage = 0.0f;
+    private int messageCount = 0;
+
+    private Map<UUID, Float> personalReputations = new HashMap<>();
+    private float communalReputation = 0.0f;
+    private float societalReputation = 0.0f;
+
+    public float getPersonalReputation(UUID playerUuid) {
+        return personalReputations.getOrDefault(playerUuid, 0.0f);
+    }
+
+    public void modifyPersonalReputation(UUID playerUuid, float amount) {
+        float current = getPersonalReputation(playerUuid);
+        float newRep = Math.max(-1.0f, Math.min(1.0f, current + amount));
+        personalReputations.put(playerUuid, newRep);
+    }
+
+    public UUID getCurrentTarget() { return currentTarget; }
+    public List<UUID> getAudience() { return audience; }
+
+    public void endInteraction(net.minecraft.world.entity.player.Player player, boolean isHotkey) {
+        if (!this.level().isClientSide() && currentTarget != null && (player == null || currentTarget.equals(player.getUUID()))) {
+            this.currentTarget = null;
+            this.audience.clear();
+            this.messageCount = 0;
+            if (isHotkey && player != null) {
+                player.sendSystemMessage(net.minecraft.network.chat.Component.literal("<System> Interaction ended."));
+            }
+        }
+    }
+
+    @Override
+    public boolean hurt(DamageSource source, float amount) {
+        if (!this.level().isClientSide() && source.getEntity() instanceof Player) {
+            Player attackingPlayer = (Player) source.getEntity();
+            modifyPersonalReputation(attackingPlayer.getUUID(), -amount * 0.1f);
+
+            accumulatedDamage += amount;
+            NPCProfile profile = NPCProfileManager.getProfile(this.getVariant());
+            if (profile != null) {
+                float threshold = profile.getFortitude() != null ? profile.getFortitude().getDamageThreshold() : Fortitude.MEDIUM.getDamageThreshold();
+                if (accumulatedDamage >= threshold) {
+                    Temperament temp = profile.getTemperament() != null ? profile.getTemperament() : Temperament.PASSIVE;
+                    String npcName = this.getCustomName() != null ? this.getCustomName().getString() : "NPC";
+                    if (temp == Temperament.PASSIVE) {
+                        if (this.goalSelector.getAvailableGoals().stream().noneMatch(g -> g.getGoal() instanceof PanicGoal)) {
+                            this.goalSelector.addGoal(0, new PanicGoal(this, 1.25D));
+
+                            // Send scared disposition message
+                            net.minecraft.server.level.ServerPlayer targetP = (net.minecraft.server.level.ServerPlayer) source.getEntity();
+                            if (targetP != null) {
+                                targetP.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> Please don't hurt me! I'm getting out of here!"));
+                            }
+                        }
+                        this.setLastHurtByMob((net.minecraft.world.entity.LivingEntity) source.getEntity());
+                    } else if (temp == Temperament.NEUTRAL) {
+                        if (this.goalSelector.getAvailableGoals().stream().noneMatch(g -> g.getGoal() instanceof MeleeAttackGoal)) {
+                            this.goalSelector.addGoal(0, new MeleeAttackGoal(this, 1.0D, true));
+
+                            // Send aggressive disposition message
+                            net.minecraft.server.level.ServerPlayer targetP = (net.minecraft.server.level.ServerPlayer) source.getEntity();
+                            if (targetP != null) {
+                                targetP.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> You'll pay for that!"));
+                            }
+                        }
+                        this.setTarget((net.minecraft.world.entity.LivingEntity) source.getEntity());
+                    }
+                    accumulatedDamage = 0.0f; // Reset after reacting
+                }
+            }
+        }
+        return super.hurt(source, amount);
+    }
+
     private static final EntityDataAccessor<String> VARIANT = SynchedEntityData.defineId(NpcEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> IS_SLIM = SynchedEntityData.defineId(NpcEntity.class, EntityDataSerializers.BOOLEAN);
 
@@ -73,6 +163,18 @@ public class NpcEntity extends PathfinderMob {
         super.addAdditionalSaveData(tag);
         tag.putString("variant", this.getVariant());
         tag.putBoolean("IsSlim", this.isSlim());
+
+        tag.putFloat("CommunalReputation", this.communalReputation);
+        tag.putFloat("SocietalReputation", this.societalReputation);
+
+        ListTag repsTag = new ListTag();
+        for (Map.Entry<UUID, Float> entry : personalReputations.entrySet()) {
+            net.minecraft.nbt.CompoundTag repTag = new net.minecraft.nbt.CompoundTag();
+            repTag.putUUID("UUID", entry.getKey());
+            repTag.putFloat("Reputation", entry.getValue());
+            repsTag.add(repTag);
+        }
+        tag.put("PersonalReputations", repsTag);
     }
 
     @Override
@@ -85,6 +187,23 @@ public class NpcEntity extends PathfinderMob {
         }
         if (tag.contains("IsSlim")) {
             this.setSlim(tag.getBoolean("IsSlim"));
+        }
+
+        if (tag.contains("CommunalReputation")) {
+            this.communalReputation = tag.getFloat("CommunalReputation");
+        }
+        if (tag.contains("SocietalReputation")) {
+            this.societalReputation = tag.getFloat("SocietalReputation");
+        }
+
+        if (tag.contains("PersonalReputations", Tag.TAG_LIST)) {
+            ListTag repsTag = tag.getList("PersonalReputations", Tag.TAG_COMPOUND);
+            for (int i = 0; i < repsTag.size(); i++) {
+                net.minecraft.nbt.CompoundTag repTag = repsTag.getCompound(i);
+                if (repTag.hasUUID("UUID")) {
+                    personalReputations.put(repTag.getUUID("UUID"), repTag.getFloat("Reputation"));
+                }
+            }
         }
     }
 
@@ -101,6 +220,18 @@ public class NpcEntity extends PathfinderMob {
 
     @Override
     public void tick() {
+        if (!this.level().isClientSide() && currentTarget != null) {
+            Player targetPlayer = this.level().getPlayerByUUID(currentTarget);
+            if (targetPlayer != null) {
+                if (this.distanceTo(targetPlayer) > 30.0D) {
+                    String npcName = this.getCustomName() != null ? this.getCustomName().getString() : "NPC";
+                    targetPlayer.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> Farewell!"));
+                    endInteraction(targetPlayer, false);
+                }
+            } else {
+                endInteraction(null, false); // Target player left
+            }
+        }
         super.tick();
         if (!this.level().isClientSide() && this.tickCount % 20 == 0) {
             String variant = this.getVariant();
@@ -121,32 +252,56 @@ public class NpcEntity extends PathfinderMob {
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0D)
-                .add(Attributes.MOVEMENT_SPEED, 0.25D);
+                .add(Attributes.MOVEMENT_SPEED, 0.25D)
+                .add(Attributes.ATTACK_DAMAGE, 2.0D);
     }
 
     @Override
-    protected InteractionResult mobInteract(Player player, InteractionHand hand) {
+    public InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (!this.level().isClientSide() && hand == InteractionHand.MAIN_HAND) {
+            if (currentTarget != null && !player.getUUID().equals(currentTarget)) {
+                return InteractionResult.PASS;
+            }
             MinecraftServer server = this.level().getServer();
             if (server != null) {
-                player.sendSystemMessage(Component.literal("<NPC> *thinking...*"));
+                if (currentTarget == null) {
+                    currentTarget = player.getUUID();
+                    audience = this.level().getEntitiesOfClass(Player.class, new AABB(this.blockPosition()).inflate(30.0D))
+                        .stream().map(Player::getUUID).collect(Collectors.toList());
+                }
 
-                LLMService.requestDialogueAsync("Hello there!")
-                    .thenAccept(responseJson -> {
+                String npcName = this.getCustomName() != null ? this.getCustomName().getString() : "NPC";
+                player.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> *thinking.*"));
+
+                // Preprogrammed messages
+                String[] msgs = {
+                    "Hello traveler, what brings you here?",
+                    "That is very interesting. Tell me more.",
+                    "I must be going now. Farewell!"
+                };
+                String text = messageCount < msgs.length ? msgs[messageCount] : msgs[msgs.length - 1];
+                messageCount++;
+
+                // Instead of actually calling LLM, we just wait and output the preprogrammed message
+                java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                    try { Thread.sleep(2000); } catch (Exception e) {}
+                    return text;
+                }).thenAccept(responseTxt -> {
                         server.execute(() -> {
-                            if (responseJson.has("spoken_text")) {
-                                String text = responseJson.get("spoken_text").getAsString();
-                                player.sendSystemMessage(Component.literal("<NPC> " + text));
-                            } else {
-                                player.sendSystemMessage(Component.literal("<NPC> *confused silence*"));
-                            }
+                                player.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> " + responseTxt));
+                                // Broadcast to audience too
+                                for (UUID audId : audience) {
+                                    if (!audId.equals(player.getUUID())) {
+                                        Player audPlayer = server.getPlayerList().getPlayer(audId);
+                                        if (audPlayer != null && distanceTo(audPlayer) <= 30.0D) {
+                                            audPlayer.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> " + responseTxt));
+                                        }
+                                    }
+                                }
+                                if (messageCount >= 3) {
+                                    endInteraction(player, false);
+                                }
                         });
-                    })
-                    .exceptionally(throwable -> {
-                        server.execute(() -> {
-                            player.sendSystemMessage(Component.literal("<System> Error communicating with NPC."));
-                        });
-                        return null;
                     });
             }
             return InteractionResult.SUCCESS;

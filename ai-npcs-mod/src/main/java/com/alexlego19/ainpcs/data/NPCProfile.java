@@ -6,6 +6,8 @@ public class NPCProfile {
     private String skinId;
     private boolean isSlim;
     private boolean isEnabled;
+    private Temperament temperament = Temperament.PASSIVE;
+    private Fortitude fortitude = Fortitude.MEDIUM;
 
     public NPCProfile(String id, String name, String skinId, boolean isSlim, boolean isEnabled) {
         this.id = id;
@@ -24,4 +26,8 @@ public class NPCProfile {
     public void setSlim(boolean slim) { isSlim = slim; }
     public boolean isEnabled() { return isEnabled; }
     public void setEnabled(boolean enabled) { isEnabled = enabled; }
+    public Temperament getTemperament() { return temperament; }
+    public void setTemperament(Temperament temperament) { this.temperament = temperament; }
+    public Fortitude getFortitude() { return fortitude; }
+    public void setFortitude(Fortitude fortitude) { this.fortitude = fortitude; }
 }
