@@ -28,6 +28,7 @@ public class ClientModEvents {
         @SubscribeEvent
         public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
             event.register(ForgeBusEvents.END_INTERACTION_KEY);
+            event.register(ForgeBusEvents.QUEST_MENU_KEY);
         }
 
         @SubscribeEvent
@@ -47,8 +48,24 @@ public class ClientModEvents {
                 "key.categories.ainpcs"
         );
 
+        public static final KeyMapping QUEST_MENU_KEY = new KeyMapping(
+                "key.ainpcs.quest_menu",
+                net.minecraftforge.client.settings.KeyConflictContext.IN_GAME,
+                net.minecraftforge.client.settings.KeyModifier.NONE,
+                com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM,
+                org.lwjgl.glfw.GLFW.GLFW_KEY_O,
+                "key.categories.ainpcs"
+        );
+
         private static int typingTick = 0;
         private static int fadeOutTick = 0;
+        private static int questNotificationTick = 0;
+        private static String questNotificationMessage = "";
+
+        public static void setQuestProgressNotification(String message) {
+            questNotificationMessage = message;
+            questNotificationTick = 100;
+        }
 
         @SubscribeEvent
         public static void onClientChat(ClientChatReceivedEvent event) {
@@ -90,11 +107,18 @@ public class ClientModEvents {
                 Minecraft mc = Minecraft.getInstance();
                 if (mc.player != null) {
                     while (END_INTERACTION_KEY.consumeClick()) {
-                        PacketHandler.INSTANCE.sendToServer(new EndInteractionPacket());
+                        com.alexlego19.ainpcs.network.PacketHandler.INSTANCE.sendToServer(new com.alexlego19.ainpcs.network.EndInteractionPacket());
+                    }
+                    while (QUEST_MENU_KEY.consumeClick()) {
+                        mc.setScreen(new com.alexlego19.ainpcs.client.gui.QuestMenuScreen());
                     }
 
                     if (fadeOutTick > 0) {
                         fadeOutTick--;
+                    }
+
+                    if (questNotificationTick > 0) {
+                        questNotificationTick--;
                     }
 
                     // Animate typing dots
@@ -125,15 +149,22 @@ public class ClientModEvents {
         }
 
         @SubscribeEvent
-        public static void onRenderGuiOverlay(RenderGuiOverlayEvent.Post event) {
-            if (fadeOutTick > 0) {
-                Minecraft mc = Minecraft.getInstance();
-                if (mc.player != null) {
+        public static void onRenderGuiOverlay(net.minecraftforge.client.event.RenderGuiOverlayEvent.Post event) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player != null) {
+                if (fadeOutTick > 0) {
                     float alpha = Math.min(1.0f, fadeOutTick / 20.0f);
                     int color = ((int)(alpha * 255)) << 24 | 0xFFFFFF;
                     String text = "Press " + END_INTERACTION_KEY.getTranslatedKeyMessage().getString() + " to leave conversation";
                     int width = mc.getWindow().getGuiScaledWidth();
                     mc.font.drawInBatch(text, (width - mc.font.width(text)) / 2f, 20f, color, true, event.getGuiGraphics().pose().last().pose(), event.getGuiGraphics().bufferSource(), net.minecraft.client.gui.Font.DisplayMode.NORMAL, 0, 15728880);
+                    event.getGuiGraphics().bufferSource().endBatch();
+                }
+                if (questNotificationTick > 0) {
+                    float alpha = Math.min(1.0f, questNotificationTick / 20.0f);
+                    int color = ((int)(alpha * 255)) << 24 | 0x00FF00;
+                    int width = mc.getWindow().getGuiScaledWidth();
+                    mc.font.drawInBatch(questNotificationMessage, (width - mc.font.width(questNotificationMessage)) / 2f, 40f, color, true, event.getGuiGraphics().pose().last().pose(), event.getGuiGraphics().bufferSource(), net.minecraft.client.gui.Font.DisplayMode.NORMAL, 0, 15728880);
                     event.getGuiGraphics().bufferSource().endBatch();
                 }
             }

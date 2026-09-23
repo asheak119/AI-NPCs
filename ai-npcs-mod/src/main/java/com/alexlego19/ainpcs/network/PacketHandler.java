@@ -17,5 +17,8 @@ public class PacketHandler {
     public static void register() {
         int id = 0;
         INSTANCE.registerMessage(id++, EndInteractionPacket.class, EndInteractionPacket::toBytes, EndInteractionPacket::new, EndInteractionPacket::handle);
+        INSTANCE.registerMessage(id++, SyncQuestPacket.class, SyncQuestPacket::toBytes, SyncQuestPacket::new, SyncQuestPacket::handle);
+        INSTANCE.registerMessage(id++, QuestProgressPacket.class, QuestProgressPacket::toBytes, QuestProgressPacket::new, QuestProgressPacket::handle);
+        INSTANCE.registerMessage(id++, CancelQuestPacket.class, CancelQuestPacket::toBytes, CancelQuestPacket::new, CancelQuestPacket::handle);
     }
 }

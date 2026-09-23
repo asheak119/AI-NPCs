@@ -46,6 +46,8 @@ public class NpcEntity extends PathfinderMob {
     private List<UUID> audience = new ArrayList<>();
     private float accumulatedDamage = 0.0f;
     private int messageCount = 0;
+    private net.minecraft.core.BlockPos spawnerPos = null;
+    private boolean hasGivenQuest = false;
 
     private Map<UUID, Float> personalReputations = new HashMap<>();
     private float communalReputation = 0.0f;
@@ -120,6 +122,7 @@ public class NpcEntity extends PathfinderMob {
 
     private static final EntityDataAccessor<String> VARIANT = SynchedEntityData.defineId(NpcEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> IS_SLIM = SynchedEntityData.defineId(NpcEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Integer> QUEST_STATUS = SynchedEntityData.defineId(NpcEntity.class, EntityDataSerializers.INT);
 
     public NpcEntity(EntityType<? extends PathfinderMob> type, Level level) {
         super(type, level);
@@ -130,6 +133,7 @@ public class NpcEntity extends PathfinderMob {
         super.defineSynchedData();
         this.entityData.define(VARIANT, "");
         this.entityData.define(IS_SLIM, false);
+        this.entityData.define(QUEST_STATUS, 0);
     }
 
     public String getVariant() {
@@ -139,6 +143,30 @@ public class NpcEntity extends PathfinderMob {
     public void setVariant(String variantId) {
         this.entityData.set(VARIANT, variantId);
         updateFromProfile(variantId);
+    }
+
+        public int getQuestStatus() {
+        return this.entityData.get(QUEST_STATUS);
+    }
+
+    public void setQuestStatus(int status) {
+        this.entityData.set(QUEST_STATUS, status);
+    }
+
+    public net.minecraft.core.BlockPos getSpawnerPos() {
+        return this.spawnerPos;
+    }
+
+    public void setSpawnerPos(net.minecraft.core.BlockPos pos) {
+        this.spawnerPos = pos;
+    }
+
+    public boolean hasGivenQuest() {
+        return this.hasGivenQuest;
+    }
+
+    public void setHasGivenQuest(boolean given) {
+        this.hasGivenQuest = given;
     }
 
     public boolean isSlim() {
@@ -162,7 +190,13 @@ public class NpcEntity extends PathfinderMob {
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         tag.putString("variant", this.getVariant());
-        tag.putBoolean("IsSlim", this.isSlim());
+                tag.putBoolean("IsSlim", this.isSlim());
+
+        tag.putInt("QuestStatus", this.getQuestStatus());
+        if (this.spawnerPos != null) {
+            tag.putLong("SpawnerPos", this.spawnerPos.asLong());
+        }
+        tag.putBoolean("HasGivenQuest", this.hasGivenQuest);
 
         tag.putFloat("CommunalReputation", this.communalReputation);
         tag.putFloat("SocietalReputation", this.societalReputation);
@@ -187,6 +221,16 @@ public class NpcEntity extends PathfinderMob {
         }
         if (tag.contains("IsSlim")) {
             this.setSlim(tag.getBoolean("IsSlim"));
+        }
+
+        if (tag.contains("QuestStatus")) {
+            this.setQuestStatus(tag.getInt("QuestStatus"));
+        }
+        if (tag.contains("SpawnerPos")) {
+            this.spawnerPos = net.minecraft.core.BlockPos.of(tag.getLong("SpawnerPos"));
+        }
+        if (tag.contains("HasGivenQuest")) {
+            this.hasGivenQuest = tag.getBoolean("HasGivenQuest");
         }
 
         if (tag.contains("CommunalReputation")) {
@@ -215,7 +259,49 @@ public class NpcEntity extends PathfinderMob {
             NPCProfile profile = NPCProfileManager.getRandomEnabledProfile();
             this.setVariant(profile.getId());
         }
+        if (!this.level().isClientSide() && this.getQuestStatus() == QUEST_NONE && Math.random() < 0.5) {
+            this.setQuestStatus(QUEST_GENERATING);
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try { Thread.sleep(2000); } catch (Exception e) {}
+            }).thenRun(() -> {
+                if (this.level().getServer() != null) {
+                    this.level().getServer().execute(() -> {
+                        if (!this.isRemoved()) {
+                            net.minecraft.core.BlockPos pos = this.blockPosition();
+                            net.minecraft.core.BlockPos foundPos = null;
+                            boolean found = false;
+                            for (int x = -32; x <= 32 && !found; x++) {
+                                for (int y = -32; y <= 32 && !found; y++) {
+                                    for (int z = -32; z <= 32 && !found; z++) {
+                                        net.minecraft.core.BlockPos checkPos = pos.offset(x, y, z);
+                                        if (this.level().getBlockState(checkPos).getBlock() == net.minecraft.world.level.block.Blocks.SPAWNER) {
+                                            foundPos = checkPos;
+                                            found = true;
+                                        }
+                                    }
+                                }
+                            }
+                            if (foundPos != null) {
+                                this.setSpawnerPos(foundPos);
+                                this.setQuestStatus(QUEST_READY);
+                                this.setPersistenceRequired();
+                            } else {
+                                this.setQuestStatus(QUEST_FAILED);
+                            }
+                        }
+                    });
+                }
+            });
+        }
         return super.finalizeSpawn(level, difficulty, reason, spawnData, dataTag);
+    }
+
+    @Override
+    public boolean removeWhenFarAway(double distanceToClosestPlayer) {
+        if (this.getQuestStatus() == QUEST_READY || this.hasGivenQuest) {
+            return false;
+        }
+        return super.removeWhenFarAway(distanceToClosestPlayer);
     }
 
     @Override
@@ -271,6 +357,28 @@ public class NpcEntity extends PathfinderMob {
                 }
 
                 String npcName = this.getCustomName() != null ? this.getCustomName().getString() : "NPC";
+
+                net.minecraft.nbt.CompoundTag playerQuest = player.getPersistentData().getCompound("AiNpcsQuest");
+                boolean playerHasThisQuest = playerQuest.contains("npcId") && playerQuest.getUUID("npcId").equals(this.getUUID());
+                if (playerHasThisQuest && playerQuest.getString("status").equals("IN_PROGRESS")) {
+                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> Have you killed 5 monsters at the spawner yet?"));
+                    endInteraction(player, false);
+                    return net.minecraft.world.InteractionResult.SUCCESS;
+                }
+                if (playerHasThisQuest && playerQuest.getString("status").equals("READY_TO_TURN_IN")) {
+                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> Thank you for clearing them out! Here is your reward."));
+                    player.spawnAtLocation(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.EMERALD, 10));
+                    player.getPersistentData().remove("AiNpcsQuest");
+                    com.alexlego19.ainpcs.network.PacketHandler.INSTANCE.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> (net.minecraft.server.level.ServerPlayer)player), new com.alexlego19.ainpcs.network.SyncQuestPacket(new net.minecraft.nbt.CompoundTag()));
+                    this.setQuestStatus(QUEST_NONE);
+                    endInteraction(player, false);
+                    return net.minecraft.world.InteractionResult.SUCCESS;
+                }
+                if (this.getQuestStatus() == QUEST_READY && !this.hasGivenQuest) {
+                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> I found a monster spawner nearby! Will you kill 5 monsters there for me? (Reply yes or accept)"));
+                    return net.minecraft.world.InteractionResult.SUCCESS;
+                }
+
                 player.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> *thinking.*"));
 
                 // Preprogrammed messages
@@ -308,4 +416,9 @@ public class NpcEntity extends PathfinderMob {
         }
         return net.minecraft.world.InteractionResult.sidedSuccess(this.level().isClientSide());
     }
+
+    public static final int QUEST_NONE = 0;
+    public static final int QUEST_GENERATING = 1;
+    public static final int QUEST_READY = 2;
+    public static final int QUEST_FAILED = 3;
 }
