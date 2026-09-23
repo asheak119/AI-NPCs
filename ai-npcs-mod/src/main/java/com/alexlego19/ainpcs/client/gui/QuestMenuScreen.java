@@ -49,7 +49,7 @@ public class QuestMenuScreen extends Screen {
             int current = questData.getInt("currentAmount");
             int target = questData.getInt("targetAmount");
 
-            guiGraphics.drawString(this.font, "Quest: Kill Monsters at Spawner", this.width / 2 - 80, this.height / 2 - 20, 0xFFFFFF);
+            guiGraphics.drawString(this.font, "Quest: Kill Zombies for the Village", this.width / 2 - 80, this.height / 2 - 20, 0xFFFFFF);
             guiGraphics.drawString(this.font, "Status: " + status, this.width / 2 - 80, this.height / 2, 0xAAAAAA);
             guiGraphics.drawString(this.font, "Progress: " + current + " / " + target, this.width / 2 - 80, this.height / 2 + 10, 0x55FF55);
         } else {

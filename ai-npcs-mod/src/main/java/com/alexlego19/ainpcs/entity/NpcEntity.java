@@ -53,14 +53,24 @@ public class NpcEntity extends PathfinderMob {
     private float communalReputation = 0.0f;
     private float societalReputation = 0.0f;
 
-    public float getPersonalReputation(UUID playerUuid) {
-        return personalReputations.getOrDefault(playerUuid, 0.0f);
+    public void modifyPersonalReputation(UUID player, float delta) {
+        float current = personalReputations.getOrDefault(player, 0.0f);
+        personalReputations.put(player, current + delta);
+        updateCommunalReputation();
     }
 
-    public void modifyPersonalReputation(UUID playerUuid, float amount) {
-        float current = getPersonalReputation(playerUuid);
-        float newRep = Math.max(-1.0f, Math.min(1.0f, current + amount));
-        personalReputations.put(playerUuid, newRep);
+    private void updateCommunalReputation() {
+        if (personalReputations.isEmpty()) {
+            communalReputation = 0.0f;
+            return;
+        }
+        float sum = 0;
+        for (float rep : personalReputations.values()) sum += rep;
+        communalReputation = sum / personalReputations.size();
+    }
+
+    public void updateSocietalReputation(float reputation) {
+        this.societalReputation = reputation;
     }
 
     public UUID getCurrentTarget() { return currentTarget; }
@@ -69,10 +79,13 @@ public class NpcEntity extends PathfinderMob {
     public void endInteraction(net.minecraft.world.entity.player.Player player, boolean isHotkey) {
         if (!this.level().isClientSide() && currentTarget != null && (player == null || currentTarget.equals(player.getUUID()))) {
             this.currentTarget = null;
-            this.audience.clear();
             this.messageCount = 0;
+            this.audience.clear();
+
+            // Inform everyone interaction ended
+            String npcName = this.getCustomName() != null ? this.getCustomName().getString() : "NPC";
             if (isHotkey && player != null) {
-                player.sendSystemMessage(net.minecraft.network.chat.Component.literal("<System> Interaction ended."));
+                 player.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> Interaction ended."));
             }
         }
     }
@@ -145,7 +158,7 @@ public class NpcEntity extends PathfinderMob {
         updateFromProfile(variantId);
     }
 
-        public int getQuestStatus() {
+    public int getQuestStatus() {
         return this.entityData.get(QUEST_STATUS);
     }
 
@@ -190,7 +203,7 @@ public class NpcEntity extends PathfinderMob {
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         tag.putString("variant", this.getVariant());
-                tag.putBoolean("IsSlim", this.isSlim());
+        tag.putBoolean("IsSlim", this.isSlim());
 
         tag.putInt("QuestStatus", this.getQuestStatus());
         if (this.spawnerPos != null) {
@@ -269,17 +282,9 @@ public class NpcEntity extends PathfinderMob {
                         if (!this.isRemoved()) {
                             net.minecraft.core.BlockPos pos = this.blockPosition();
                             net.minecraft.core.BlockPos foundPos = null;
-                            boolean found = false;
-                            for (int x = -32; x <= 32 && !found; x++) {
-                                for (int y = -32; y <= 32 && !found; y++) {
-                                    for (int z = -32; z <= 32 && !found; z++) {
-                                        net.minecraft.core.BlockPos checkPos = pos.offset(x, y, z);
-                                        if (this.level().getBlockState(checkPos).getBlock() == net.minecraft.world.level.block.Blocks.SPAWNER) {
-                                            foundPos = checkPos;
-                                            found = true;
-                                        }
-                                    }
-                                }
+                            if (this.level() instanceof net.minecraft.server.level.ServerLevel) {
+                                net.minecraft.server.level.ServerLevel serverLevel = (net.minecraft.server.level.ServerLevel) this.level();
+                                foundPos = serverLevel.findNearestMapStructure(net.minecraft.tags.StructureTags.VILLAGE, pos, 100, false);
                             }
                             if (foundPos != null) {
                                 this.setSpawnerPos(foundPos);
@@ -358,10 +363,11 @@ public class NpcEntity extends PathfinderMob {
 
                 String npcName = this.getCustomName() != null ? this.getCustomName().getString() : "NPC";
 
+                // Quest Checks
                 net.minecraft.nbt.CompoundTag playerQuest = player.getPersistentData().getCompound("AiNpcsQuest");
                 boolean playerHasThisQuest = playerQuest.contains("npcId") && playerQuest.getUUID("npcId").equals(this.getUUID());
                 if (playerHasThisQuest && playerQuest.getString("status").equals("IN_PROGRESS")) {
-                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> Have you killed 5 monsters at the spawner yet?"));
+                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> Have you killed 5 zombies to protect the village yet?"));
                     endInteraction(player, false);
                     return net.minecraft.world.InteractionResult.SUCCESS;
                 }
@@ -375,7 +381,7 @@ public class NpcEntity extends PathfinderMob {
                     return net.minecraft.world.InteractionResult.SUCCESS;
                 }
                 if (this.getQuestStatus() == QUEST_READY && !this.hasGivenQuest) {
-                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> I found a monster spawner nearby! Will you kill 5 monsters there for me? (Reply yes or accept)"));
+                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("<" + npcName + "> I found a village nearby that needs protection! Will you kill 5 zombies for me? (Reply yes or accept)"));
                     return net.minecraft.world.InteractionResult.SUCCESS;
                 }
 

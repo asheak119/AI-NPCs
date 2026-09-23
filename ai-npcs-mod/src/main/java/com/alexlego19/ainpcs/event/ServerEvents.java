@@ -109,19 +109,16 @@ public class ServerEvents {
                 int current = questData.getInt("currentAmount");
                 int target = questData.getInt("targetAmount");
                 if (current < target) {
-                    if (event.getEntity() instanceof net.minecraft.world.entity.monster.Monster) {
-                        net.minecraft.core.BlockPos spawnerPos = questData.contains("spawnerPos") ? net.minecraft.core.BlockPos.of(questData.getLong("spawnerPos")) : null;
-                        if (spawnerPos == null || event.getEntity().distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(spawnerPos)) <= 400.0D) {
-                            current++;
-                            questData.putInt("currentAmount", current);
-                            if (current >= target) {
-                                questData.putString("status", "READY_TO_TURN_IN");
-                                com.alexlego19.ainpcs.network.PacketHandler.INSTANCE.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player), new com.alexlego19.ainpcs.network.QuestProgressPacket("Quest Complete: Return to the NPC!"));
-                            } else {
-                                com.alexlego19.ainpcs.network.PacketHandler.INSTANCE.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player), new com.alexlego19.ainpcs.network.QuestProgressPacket("Quest Progress: " + current + " / " + target + " Monsters Killed"));
-                            }
-                            com.alexlego19.ainpcs.network.PacketHandler.INSTANCE.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player), new com.alexlego19.ainpcs.network.SyncQuestPacket(questData));
+                    if (event.getEntity() instanceof net.minecraft.world.entity.monster.Zombie) {
+                        current++;
+                        questData.putInt("currentAmount", current);
+                        if (current >= target) {
+                            questData.putString("status", "READY_TO_TURN_IN");
+                            com.alexlego19.ainpcs.network.PacketHandler.INSTANCE.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player), new com.alexlego19.ainpcs.network.QuestProgressPacket("Quest Complete: Return to the NPC!"));
+                        } else {
+                            com.alexlego19.ainpcs.network.PacketHandler.INSTANCE.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player), new com.alexlego19.ainpcs.network.QuestProgressPacket("Quest Progress: " + current + " / " + target + " Zombies Killed"));
                         }
+                        com.alexlego19.ainpcs.network.PacketHandler.INSTANCE.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player), new com.alexlego19.ainpcs.network.SyncQuestPacket(questData));
                     }
                 }
             }
