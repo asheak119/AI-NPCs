@@ -32,29 +32,6 @@ public class NpcRenderer extends HumanoidMobRenderer<NpcEntity, PlayerModel<NpcE
 
 
     @Override
-    protected boolean isShaking(NpcEntity entity) {
-        return super.isShaking(entity);
-    }
-
-    @Override
-    protected boolean isBodyVisible(NpcEntity entity) {
-        return super.isBodyVisible(entity);
-    }
-
-    @Override
-    protected int getBlockLightLevel(NpcEntity entity, net.minecraft.core.BlockPos pos) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            net.minecraft.nbt.CompoundTag questData = mc.player.getPersistentData().getCompound("AiNpcsQuest");
-            if (questData.contains("npcId") && questData.getUUID("npcId").equals(entity.getUUID()) && questData.getString("status").equals("IN_PROGRESS")) {
-                entity.setGlowingTag(true);
-            } else {
-                entity.setGlowingTag(false);
-            }
-        }
-        return super.getBlockLightLevel(entity, pos);
-    }
-    @Override
     public void render(NpcEntity entity, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
         if (entity.isSlim()) {
             this.model = this.slimModel;
